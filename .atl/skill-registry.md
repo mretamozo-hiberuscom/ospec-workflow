@@ -50,7 +50,7 @@ Pre-digested rules per skill. Delegators copy matching blocks into sub-agent pro
 - The linked issue must have `status:approved` before PR creation.
 - Every PR must have exactly one `type:*` label matching the PR type.
 - Branch names must match `type/description` with lowercase `a-z0-9._-`.
-- Use Conventional Commits and never add `Co-Authored-By` trailers.
+- Use Conventional Commits with English `type` and Spanish imperative description; never add `Co-Authored-By` trailers.
 - Run required checks, including shellcheck for changed shell scripts, before merge readiness.
 
 ### caveman
@@ -63,8 +63,9 @@ Pre-digested rules per skill. Delegators copy matching blocks into sub-agent pro
 
 ### caveman-commit
 - Generate only the commit message; do not stage, commit, amend, or edit files.
-- Use Conventional Commits: `<type>(<scope>): <imperative summary>`.
+- Use Conventional Commits: `<type>(<scope>): <imperative Spanish summary>`.
 - Prefer subject <=50 chars, hard cap 72 chars.
+- Write subject and body in Spanish; use imperative verbs like `añade`, `corrige`, `elimina`.
 - Never add `Co-Authored-By`, AI attribution, emojis, `I`, `we`, or `this commit`.
 - Add body only for non-obvious why, breaking changes, migrations, security fixes, reverts, or linked issues.
 - Return only the commit message in a fenced text block.
@@ -154,6 +155,7 @@ Pre-digested rules per skill. Delegators copy matching blocks into sub-agent pro
 - Commit by deliverable behavior, fix, migration, or docs unit, not by file type.
 - Keep tests with the behavior they verify.
 - Keep docs with the user-visible change they explain.
+- Keep the Conventional Commit type in English, but write subject and body in Spanish imperative prose.
 - Each commit should be understandable, independently reviewable, and reasonably rollbackable.
 - If a PR approaches 400 changed lines, promote work units into chained PR slices.
 - Use SDD workload forecast and cached delivery strategy before oversized implementation.

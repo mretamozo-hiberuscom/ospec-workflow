@@ -143,12 +143,13 @@ Commit messages MUST match this regex:
 ^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9\._-]+\))?!?: .+
 ```
 
-**Format:** `type(scope): description` or `type: description`
+**Format:** `type(scope): descripción` or `type: descripción`
 
 - `type` — required, one of: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`
 - `(scope)` — optional, lowercase with `a-z0-9._-`
 - `!` — optional, indicates breaking change
-- `description` — required, starts after `: `
+- `description` — required, starts after `: ` and MUST be Spanish imperative
+- Commit body, when needed, MUST be Spanish prose
 
 Type-to-label mapping:
 
@@ -169,17 +170,17 @@ Type-to-label mapping:
 
 Examples:
 ```
-feat(scripts): add Codex support to setup.sh
-fix(skills): correct topic key format in sdd-apply
-docs(readme): update multi-model configuration guide
-refactor(skills): extract shared persistence logic
-chore(ci): add shellcheck to PR validation workflow
-perf(scripts): reduce setup.sh execution time
-style(skills): fix markdown formatting
-test(scripts): add setup.sh integration tests
-ci(workflows): add branch name validation
-revert: undo broken setup change
-feat!: redesign skill loading system
+feat(scripts): añade soporte de Codex a setup.sh
+fix(skills): corrige el formato de topic en sdd-apply
+docs(readme): actualiza la guía de configuración multi-modelo
+refactor(skills): extrae la lógica compartida de persistencia
+chore(ci): añade shellcheck a la validación de PR
+perf(scripts): reduce el tiempo de ejecución de setup.sh
+style(skills): corrige el formato markdown
+test(scripts): añade pruebas de integración para setup.sh
+ci(workflows): añade validación de nombres de rama
+revert: deshaz el cambio roto de setup
+feat!: rediseña el sistema de carga de skills
 ```
 
 ---
@@ -195,7 +196,7 @@ shellcheck scripts/*.sh
 
 # Push and create PR
 git push -u origin feat/my-feature
-gh pr create --title "feat(scope): description" --body "Closes #N"
+gh pr create --title "feat(scope): añade descripción" --body "Closes #N"
 
 # Add type label to PR
 gh pr edit <pr-number> --add-label "type:feature"

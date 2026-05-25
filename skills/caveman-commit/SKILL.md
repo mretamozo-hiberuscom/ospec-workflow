@@ -13,11 +13,11 @@ Load when the user asks for a commit message or invokes `/commit` or `/caveman-c
 
 ## Hard Rules
 
-- Use Conventional Commits: `<type>(<scope>): <imperative summary>`.
+- Use Conventional Commits: `<type>(<scope>): <imperative Spanish summary>`.
 - Prefer subject length <=50 chars; hard cap 72 chars.
-- Use imperative mood: `add`, `fix`, `remove`; never `added`, `adds`, or `adding`.
+- Write the summary in Spanish imperative: `añade`, `corrige`, `elimina`; never participles like `añadido`, gerunds like `añadiendo`, or infinitives like `añadir`.
 - Do not add `Co-Authored-By`, AI attribution, emojis, "I", "we", or "this commit".
-- Add a body only for non-obvious why, breaking changes, migrations, security fixes, reverts, or linked issues.
+- Add a Spanish body only for non-obvious why, breaking changes, migrations, security fixes, reverts, or linked issues.
 - Wrap body at 72 chars. Use `BREAKING CHANGE:` for breaking changes.
 - Do not stage, commit, amend, or modify files.
 
@@ -34,7 +34,7 @@ Load when the user asks for a commit message or invokes `/commit` or `/caveman-c
 
 1. Inspect the provided diff or staged changes when available.
 2. Choose the narrowest correct type and optional scope.
-3. Write the shortest accurate subject.
+3. Write the shortest accurate Spanish imperative subject.
 4. Add body only when the future reader needs context not visible in the diff.
 
 ## Output Contract

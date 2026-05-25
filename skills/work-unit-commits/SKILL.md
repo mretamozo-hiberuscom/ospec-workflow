@@ -29,6 +29,7 @@ Use it for:
 | Keep docs with the user-visible change | Docs belong with the feature or workflow they explain. |
 | Tell a story | A reviewer should understand why each commit exists from its diff and message. |
 | Future PR-ready | Each commit should be a candidate chained PR when the change grows. |
+| Spanish imperative message | Keep the Conventional Commit type in English, but write the subject and body in Spanish imperative prose. |
 | SDD workload guard | If SDD tasks forecast a >400-line change, group commits into chained PR slices before implementation. |
 
 ## Work Unit Checklist
@@ -39,14 +40,14 @@ Before committing, confirm:
 - [ ] The repo still makes sense after applying only this commit.
 - [ ] Tests or docs for this unit are included when relevant.
 - [ ] Rollback is reasonable without reverting unrelated work.
-- [ ] The commit message explains the outcome, not the file list.
+- [ ] The commit message explains the outcome in Spanish imperative, not the file list.
 
 ## Split Examples
 
 | Weak split | Better work-unit split |
 |------------|------------------------|
-| `add models` | `feat(auth): add token validation domain model and tests` |
-| `add services` | `feat(auth): wire token validation into login flow` |
+| `add models` | `feat(auth): añade el modelo de dominio para validar tokens` |
+| `add services` | `feat(auth): conecta la validación de tokens al login` |
 | `add tests` | Tests included with each behavior commit |
 | `update docs` | Docs included with the user-facing change they explain |
 
@@ -56,7 +57,7 @@ Use work-unit commits as the foundation for chained PRs:
 
 1. Build the smallest independent work unit.
 2. Include verification for that unit.
-3. Commit it with a Conventional Commit message.
+3. Commit it with a Conventional Commit message in Spanish imperative.
 4. If the PR approaches 400 changed lines, promote commits or groups of commits into chained PRs.
 
 ## SDD Relationship
