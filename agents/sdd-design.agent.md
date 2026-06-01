@@ -28,11 +28,13 @@ Use OpenSpec as the artifact store. Read and write project artifacts directly fr
 
 Execute all steps from the skill directly in this context window:
 1. Read proposal artifact (required): `openspec/changes/{change-name}/proposal.md`
-2. Read existing code architecture to understand current patterns
-3. Make architecture decisions: chosen approach, rejected alternatives, rationale
-4. Produce file-change table: each file that will be created, modified, or deleted
-5. Include sequence diagrams for complex flows when useful (Mermaid or ASCII)
-6. Write the design artifact to `openspec/changes/{change-name}/design.md`
+2. Resolve design mode: `design-after-spec` when `openspec/changes/{change-name}/specs/**/spec.md` exists, otherwise `design-from-proposal`
+3. In `design-after-spec`, read every change-local spec before reading code architecture so the design allocates every MUST scenario
+4. Read existing code architecture to understand current patterns
+5. Make architecture decisions: chosen approach, rejected alternatives, rationale
+6. Produce file-change table: each file that will be created, modified, or deleted
+7. Include sequence diagrams for complex flows when useful (Mermaid or ASCII)
+8. Write the design artifact to `openspec/changes/{change-name}/design.md`
 
 ## Result Contract
 

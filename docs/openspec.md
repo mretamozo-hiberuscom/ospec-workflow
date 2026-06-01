@@ -18,6 +18,7 @@ openspec/
       state.yaml
       exploration.md
       proposal.md
+      proposal-lite.md
       design.md
       tasks.md
       apply-progress.md
@@ -49,7 +50,7 @@ Guarda contexto del proyecto:
 | Spec principal | `openspec/specs/{domain}/spec.md` | Comportamiento vigente del sistema. |
 | Spec delta | `openspec/changes/{change-name}/specs/{domain}/spec.md` | Cambio propuesto sobre ese comportamiento. |
 
-Durante un cambio, no se edita directamente la spec principal salvo que sea una capacidad totalmente nueva y el flujo lo permita. Lo normal es escribir delta specs y fusionarlas en archive.
+Durante `sdd-spec` no se escribe directamente en `openspec/specs/`. Tanto las modificaciones sobre dominios existentes como las capacidades nuevas viven primero en `openspec/changes/{change-name}/specs/...`. Para capacidades nuevas, esa spec change-local es temporal por diseno: `sdd-archive` es la unica fase que la promociona a `openspec/specs/{domain}/spec.md`.
 
 ## Formato de delta
 
@@ -70,13 +71,15 @@ La regla critica esta en MODIFIED: copiar el requisito completo desde la spec pr
 | Fase | Artefacto |
 | --- | --- |
 | Explore | `exploration.md` |
-| Propose | `proposal.md` |
+| Propose | `proposal.md` o `proposal-lite.md` (solo en lite mode) |
 | Spec | `specs/{domain}/spec.md` dentro del cambio |
 | Design | `design.md` |
 | Tasks | `tasks.md` |
-| Apply | `apply-progress.md` y checks en `tasks.md` |
+| Apply | `apply-progress.md` y estados `[ ]` / `[~]` / `[x]` en `tasks.md` |
 | Verify | `verify-report.md` |
 | Archive | `archive-report.md`, specs principales actualizadas y carpeta movida |
+
+Ademas, cada fase que persiste artefactos debe leer, fusionar y actualizar `openspec/changes/{change-name}/state.yaml`. La recuperacion depende de ese archivo; no es un detalle opcional.
 
 ## Archivo
 
@@ -87,7 +90,12 @@ openspec/changes/{change-name}/
   -> openspec/changes/archive/YYYY-MM-DD-{change-name}/
 ```
 
-Antes de mover, `sdd-archive` debe sincronizar specs:
+Antes de mover, `sdd-archive` debe validar el cierre:
+
+- `FAIL` bloquea el archive.
+- `PASS WITH WARNINGS` solo puede pasar si los riesgos quedan aceptados de forma explicita o convertidos en follow-up.
+
+Si el cambio tiene delta specs, despues sincroniza specs:
 
 | Delta | Accion sobre spec principal |
 | --- | --- |
@@ -128,7 +136,7 @@ Si una conversacion se pierde o se compacta, se recupera leyendo:
 ```text
 openspec/config.yaml
 openspec/changes/*/state.yaml
-openspec/changes/{change-name}/proposal.md
+openspec/changes/{change-name}/proposal.md o proposal-lite.md
 openspec/changes/{change-name}/specs/**
 openspec/changes/{change-name}/design.md
 openspec/changes/{change-name}/tasks.md

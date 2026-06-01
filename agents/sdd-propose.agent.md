@@ -28,17 +28,18 @@ Use OpenSpec as the artifact store. Read and write project artifacts directly fr
 
 Execute all steps from the skill directly in this context window:
 1. Read exploration artifact if available: `openspec/changes/{change-name}/exploration.md`
-2. Research `openspec/specs/` before filling the capabilities contract
-3. Draft the proposal: intent, scope, capabilities, approach, affected areas, risks, rollback plan, and success criteria
-4. Keep the proposal concise and concrete
-5. Write the proposal artifact to `openspec/changes/{change-name}/proposal.md`
+2. Resolve proposal mode: `standard` writes `proposal.md`; `lite` writes `proposal-lite.md`
+3. In standard mode, research `openspec/specs/` before filling the capabilities contract
+4. Draft the artifact appropriate to the mode: full proposal for standard SDD, concise bounded contract for lite mode
+5. Keep the proposal concise and concrete
+6. Write the proposal artifact to `openspec/changes/{change-name}/proposal.md` or `openspec/changes/{change-name}/proposal-lite.md`
 
 ## Result Contract
 
 Return a structured result with these fields:
 - `status`: `success` | `blocked` | `partial`
 - `executive_summary`: one-sentence description of the proposed change and its approach
-- `artifacts`: OpenSpec file paths written, especially `openspec/changes/{change-name}/proposal.md`
+- `artifacts`: OpenSpec file paths written, especially `openspec/changes/{change-name}/proposal.md` or `openspec/changes/{change-name}/proposal-lite.md`
 - `next_recommended`: `sdd-spec` and `sdd-design` (can run in parallel)
 - `risks`: architectural risks or open questions identified during proposal
 - `skill_resolution`: `injected`, `fallback-registry`, `fallback-path`, or `none`

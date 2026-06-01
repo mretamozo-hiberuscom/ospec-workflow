@@ -20,13 +20,13 @@ Default: use `openspec` for persisted SDD workflows. Use `none` only when the us
 | `openspec` | Filesystem | Filesystem | Yes |
 | `none` | Orchestrator prompt context | Nowhere | Never |
 
-## State Persistence (Orchestrator)
+## State Persistence
 
-The orchestrator persists DAG state after each phase transition to enable SDD recovery when file-based persistence is active.
+Each phase executor persists DAG state when it writes its own artifact, and the orchestrator may repair or advance that state when routing the next phase. This keeps recovery anchored in the filesystem even when chat context is compacted.
 
 | Mode | Persist State | Recover State |
 |------|--------------|---------------|
-| `openspec` | Write `openspec/changes/{change-name}/state.yaml` | Read `openspec/changes/{change-name}/state.yaml` |
+| `openspec` | Read-merge-update `openspec/changes/{change-name}/state.yaml` on every phase transition | Read `openspec/changes/{change-name}/state.yaml` |
 | `none` | Not possible — warn user | Not possible |
 
 ## Common Rules
@@ -64,13 +64,16 @@ Artifact store mode: {openspec|none}
 
 If mode is `openspec`, read the required artifacts from:
 - openspec/changes/{change-name}/proposal.md
+- openspec/changes/{change-name}/proposal-lite.md
 - openspec/changes/{change-name}/specs/**/spec.md
 - openspec/changes/{change-name}/design.md
 - openspec/changes/{change-name}/tasks.md
+- openspec/changes/{change-name}/state.yaml
 - openspec/config.yaml
 
 PERSISTENCE (MANDATORY when mode is `openspec`):
 After completing your work, write the phase artifact to the expected OpenSpec path.
+Then update openspec/changes/{change-name}/state.yaml with the new phase status and timestamp.
 If you return without writing it, the next phase CANNOT find your artifact and the pipeline BREAKS.
 ```
 
@@ -80,6 +83,7 @@ Artifact store mode: {openspec|none}
 
 PERSISTENCE (MANDATORY when mode is `openspec`):
 After completing your work, write the phase artifact to the expected OpenSpec path.
+Then update openspec/changes/{change-name}/state.yaml with the new phase status and timestamp.
 If mode is `none`, return the artifact inline only.
 ```
 

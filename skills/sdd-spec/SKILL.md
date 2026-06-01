@@ -44,8 +44,9 @@ Read the proposal's **Capabilities section** — this is your primary contract:
 
 ```
 FOR EACH entry under "New Capabilities":
-├── This becomes a NEW full spec: openspec/specs/<capability-name>/spec.md
-└── Write a complete spec (not a delta) — no existing behavior to reference
+├── This becomes a NEW full spec: openspec/changes/{change-name}/specs/<capability-name>/spec.md
+├── Write a complete spec (not a delta) — no existing behavior to reference
+└── NEVER write directly to openspec/specs/ during sdd-spec; archive promotes it later
 
 FOR EACH entry under "Modified Capabilities":
 ├── This becomes a DELTA spec: openspec/changes/{change-name}/specs/<capability-name>/spec.md
@@ -56,7 +57,7 @@ If the proposal has no Capabilities section (older format), fall back to inferri
 
 ### Step 3: Read Existing Specs
 
-**IF mode is `openspec`:** If `openspec/specs/{domain}/spec.md` exists, read it to understand CURRENT behavior. Your delta specs describe CHANGES to this behavior.
+**IF mode is `openspec`:** If `openspec/specs/{domain}/spec.md` exists, read it to understand CURRENT behavior before writing a modified-domain delta. New domains stay change-local and do not need a main-spec read.
 
 **IF mode is `none`:** Skip — no existing specs to read.
 
@@ -69,8 +70,10 @@ openspec/changes/{change-name}/
 ├── proposal.md              ← (already exists)
 └── specs/
     └── {domain}/
-        └── spec.md          ← Delta spec
+  └── spec.md          ← Change-local spec (delta for existing domains, full spec for new domains)
 ```
+
+For NEW capabilities, this change-local full spec is temporary by design. `sdd-archive` is the only phase allowed to promote it into `openspec/specs/{domain}/spec.md`.
 
 **IF mode is `none`:** Do NOT create any `openspec/` directories or files. Compose the spec content in memory and return it inline in Step 6.
 
@@ -212,8 +215,9 @@ Ready for design (sdd-design). If design already exists, ready for tasks (sdd-ta
 - DO NOT include implementation details in specs — specs describe WHAT, not HOW
 - **MODIFIED requirements MUST be the FULL block** — copy entire requirement + all scenarios from main spec, then edit. Partial MODIFIED blocks lose content at archive time.
 - If adding new behavior without changing existing behavior → use ADDED, not MODIFIED
+- New capabilities ALWAYS stay under `openspec/changes/{change-name}/specs/{domain}/spec.md` until archive. `sdd-spec` never writes directly into `openspec/specs/`.
 - Apply any `rules.specs` from `openspec/config.yaml`
-- **Size budget**: Spec artifact MUST be under 650 words. Prefer requirement tables over narrative descriptions. Each scenario: 3-5 lines max.
+- **Size budget**: Spec budget is elastic per domain. Target 650 words or less for each domain file; multi-domain changes may exceed 650 words in aggregate, but each domain still needs concise normative text. Prefer tables over narrative descriptions. Each scenario: 3-5 lines max.
 - Return envelope per **Section D** from `skills/_shared/sdd-phase-common.md`.
 
 ## RFC 2119 Keywords Quick Reference

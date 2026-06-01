@@ -28,14 +28,18 @@ Use OpenSpec as the artifact store. Read and write project artifacts directly fr
 
 Execute all steps from the skill directly in this context window:
 1. Read tasks artifact (required): `openspec/changes/{change-name}/tasks.md`
-2. Read spec artifacts (required): `openspec/changes/{change-name}/specs/**/spec.md`
-3. Read design artifact (required): `openspec/changes/{change-name}/design.md`
-4. Read previous apply progress if it exists: `openspec/changes/{change-name}/apply-progress.md`; merge new progress instead of overwriting it
-5. Detect TDD mode from `openspec/config.yaml` or existing test patterns
-6. Implement assigned tasks: in Strict TDD mode follow RED -> GREEN -> TRIANGULATE -> REFACTOR; in standard mode write code then verify
-7. Match existing code patterns and conventions
-8. Mark each completed task `[x]` in `openspec/changes/{change-name}/tasks.md`
-9. Persist progress to `openspec/changes/{change-name}/apply-progress.md`
+2. In standard mode, read spec artifacts (required): `openspec/changes/{change-name}/specs/**/spec.md`
+3. In standard mode, read design artifact (required): `openspec/changes/{change-name}/design.md`
+4. In lite mode, read `openspec/changes/{change-name}/proposal-lite.md` as the behavior contract
+5. Read previous apply progress if it exists: `openspec/changes/{change-name}/apply-progress.md`; merge new progress instead of overwriting it
+6. Detect TDD mode from `openspec/config.yaml` or existing test patterns
+7. Implement assigned tasks: in Strict TDD mode follow RED -> GREEN -> TRIANGULATE -> REFACTOR; in standard mode write code, verify locally, and use `[~]` or `[x]` accurately
+8. Match existing code patterns and conventions
+9. Abort with `blocked: spec-change-required` if the standard-mode spec is wrong or impossible to verify; never patch specs during apply
+10. Abort with `blocked: escalate-to-standard-sdd` if lite mode no longer fits the change
+11. Abort with `partial` and risk `workload-escalation` if the live change estimate drifts above forecast by >50% or will exceed the 400-line budget before the next task boundary
+12. Mark each task `[~]` or `[x]` in `openspec/changes/{change-name}/tasks.md` according to local verification status
+13. Persist progress to `openspec/changes/{change-name}/apply-progress.md` using append-style updates instead of rewriting untouched history
 
 ## Result Contract
 

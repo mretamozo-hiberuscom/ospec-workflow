@@ -35,6 +35,8 @@ proposal -> specs --> tasks -> apply -> verify -> archive
              ^
              |
            design
+
+lite: proposal-lite -> tasks -> apply -> verify
 ```
 
 Antes de ese ciclo hay dos puertas importantes:
@@ -55,6 +57,7 @@ Esto importa porque la IA ejecuta muy rapido, pero si no hay contexto ni contrat
 | `/sdd-explore <tema>` | Investiga una idea antes de comprometerse con una solucion. |
 | `/sdd-new <cambio>` | Arranca un cambio con exploracion y propuesta. |
 | `/sdd-ff <nombre>` | Avanza rapido por propuesta, specs, diseno y tareas. |
+| `/sdd-lite <nombre>` | Usa el flujo reducido `proposal-lite -> tasks -> apply -> verify` para cambios `trivial` o `small`. |
 | `/sdd-continue [cambio]` | Continua la siguiente fase pendiente segun el estado OpenSpec. |
 | `/sdd-apply [cambio]` | Implementa tareas planificadas y guarda progreso. |
 | `/sdd-verify [cambio]` | Verifica implementacion contra specs, diseno, tareas y tests reales. |
@@ -92,10 +95,12 @@ Lee en este orden:
 
 ## Reglas que protegen el workflow
 
-- `sdd-init` se ejecuta antes de cualquier fase SDD si falta contexto.
+- `sdd-init` solo se autoejecuta antes de solicitudes SDD persistidas explicitas; ante preguntas vagas, el orquestador debe pedir permiso antes de crear `openspec/`.
 - En proyectos vacios, `sdd-foundation` va antes de planificar cambios normales.
 - El orquestador pasa reglas compactas desde `.atl/skill-registry.md`; los subagentes no dependen de memoria implicita.
+- `sdd-init` y `skill-registry` degradan roots externos faltantes, rotos o sin permisos a warnings; no deben abortar el bootstrap por eso.
 - El modo operativo actual del orquestador usa OpenSpec persistido en `openspec/`.
+- Cada fase persistida debe actualizar `openspec/changes/{change-name}/state.yaml`; la recuperacion depende de ese estado.
 - `sdd-tasks` debe incluir forecast de revision y presupuesto base de 400 lineas cambiadas.
 - `sdd-apply` no debe empezar trabajo sobredimensionado sin decision de entrega: cadena de PRs o `size:exception`.
 - Si Strict TDD esta activo, `sdd-apply` debe guardar evidencia RED/GREEN/TRIANGULATE/REFACTOR.
@@ -118,6 +123,7 @@ openspec/
       state.yaml
       exploration.md
       proposal.md
+      proposal-lite.md
       design.md
       tasks.md
       apply-progress.md

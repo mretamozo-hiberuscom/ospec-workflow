@@ -35,6 +35,47 @@ TDD no es "hacer tests". TDD es disenar desde comportamiento. Si escribes el cod
 
 `sdd-verify` despues comprueba esa evidencia contra archivos y ejecuciones reales. Si falta o no se puede probar, es CRITICAL.
 
+En paralelo, `tasks.md` refleja el estado real del trabajo:
+
+- `[ ]` no empezado
+- `[~]` implementado pero con verificacion local pendiente
+- `[x]` implementado y verificado localmente
+
+`apply-progress.md` ya no se trata como snapshot descartable. `sdd-apply` debe leer el progreso previo y hacer merge append-first para no perder evidencia historica.
+
+## Niveles de evidencia en verify
+
+`sdd-verify` clasifica cada escenario con la evidencia mas fuerte que puede probar:
+
+| Nivel | Que demuestra |
+| --- | --- |
+| `runtime-test` | Un test automatizado se ejecuto y paso. |
+| `static-proof` | Build, typecheck, schema validation o equivalente prueba el comportamiento. |
+| `inspection-proof` | La inspeccion del codigo vincula el escenario con rutas concretas y una justificacion tecnica. |
+| `manual-proof` | Hubo verificacion manual registrada. |
+| `no-proof` | No hay evidencia creible. |
+
+Regla dura:
+
+- Un MUST necesita `runtime-test` o un `static-proof` aceptado.
+- Un SHOULD puede pasar con `inspection-proof`, pero deja WARNING.
+- Un MAY puede vivir con evidencia mas debil si la limitacion queda documentada.
+- `no-proof` es CRITICAL para MUST y WARNING para SHOULD/MAY.
+
+## Veredictos y routing
+
+El cierre de verify es uno de estos:
+
+| Veredicto | Uso |
+| --- | --- |
+| `PASS` | No hay hallazgos que bloqueen y la evidencia cumple el nivel exigido. |
+| `PASS WITH WARNINGS` | El cambio es aceptable, pero quedan riesgos o pruebas mas debiles de lo ideal. |
+| `FAIL` | Hay CRITICAL, tareas core incompletas o falta evidencia obligatoria. |
+
+Cada CRITICAL o WARNING debe salir con pista de origen: `code-bug`, `tasks-gap`, `design-gap` o `spec-gap`. Eso evita el antipatron de "arreglar cualquier cosa" sin tocar la fuente real del problema.
+
+`sdd-archive` solo puede cerrar cambios con `PASS` o con `PASS WITH WARNINGS` cuando esos riesgos quedan aceptados o convertidos en follow-up. `FAIL` bloquea archive.
+
 ## Calidad de aserciones
 
 No todo test cuenta. Un test malo es peor que nada porque da confianza falsa.

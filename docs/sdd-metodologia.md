@@ -70,4 +70,6 @@ No hace falta SDD completo para:
 - Ajustes triviales de documentacion.
 - Experimentos desechables.
 
-La regla sana: si alguien tendria que revisar el "que", el "por que" o el "como", usa SDD. Si solo hay que corregir una errata, no montes una catedral.
+Para ese espacio intermedio entre "una errata" y "un cambio normal" existe `/sdd-lite`: usa `proposal-lite.md -> tasks.md -> apply -> verify` para cambios `trivial` o `small` sin abrir specs/diseno completos. Si durante el trabajo deja de ser pequeno, se escala al flujo estandar.
+
+La regla sana: si alguien tendria que revisar el "que", el "por que" o el "como", usa SDD. Si el cambio es acotado pero aun quieres trazabilidad y gates, usa lite. Si solo hay que corregir una errata, no montes una catedral.

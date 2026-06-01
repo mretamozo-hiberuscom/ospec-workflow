@@ -40,9 +40,16 @@ Follow **Section A** from `skills/_shared/sdd-phase-common.md`.
 
 ### Step 2: Sync Delta Specs to Main Specs
 
+Before syncing anything, inspect `openspec/changes/{change-name}/verify-report.md` and enforce the close gate:
+- `FAIL` blocks archive completely.
+- `PASS WITH WARNINGS` may proceed only when the warnings are explicitly documented as accepted risks or converted into follow-up work.
+- If warning acceptance is missing, STOP and return `blocked`.
+
 **IF mode is `none`:** Skip — no artifacts to sync.
 
 **IF mode is `openspec`:** For each delta spec in `openspec/changes/{change-name}/specs/`:
+
+If no delta specs exist (common in lite mode), skip spec sync and archive the change artifacts as-is.
 
 #### If Main Spec Exists (`openspec/specs/{domain}/spec.md`)
 
@@ -88,7 +95,7 @@ Use today's date in ISO format (e.g., `2026-02-16`).
 **IF mode is `openspec`:** Confirm:
 - [ ] Main specs updated correctly
 - [ ] Change folder moved to archive
-- [ ] Archive contains all artifacts (proposal, specs, design, tasks)
+- [ ] Archive contains all expected artifacts for this mode (proposal or proposal-lite, tasks, and specs/design when present)
 - [ ] Active changes directory no longer has this change
 
 **IF mode is `none`:** Skip verification — no persisted artifacts.
@@ -117,9 +124,9 @@ Return to the orchestrator:
 | {domain} | Created/Updated | {N added, M modified, K removed requirements} |
 
 ### Archive Contents
-- proposal.md ✅
-- specs/ ✅
-- design.md ✅
+- proposal.md or proposal-lite.md ✅
+- specs/ (if present) ✅
+- design.md (if present) ✅
 - tasks.md ✅ ({N}/{N} tasks complete)
 
 ### Source of Truth Updated
@@ -134,6 +141,8 @@ Ready for the next change.
 ## Rules
 
 - NEVER archive a change that has CRITICAL issues in its verification report
+- NEVER archive when verification verdict is `FAIL`
+- Archive with `PASS WITH WARNINGS` only if accepted risks or follow-up tasks are explicitly recorded in the archive report
 - ALWAYS sync delta specs BEFORE moving to archive
 - When merging into existing specs, PRESERVE requirements not mentioned in the delta
 - Use ISO date format (YYYY-MM-DD) for archive folder prefix

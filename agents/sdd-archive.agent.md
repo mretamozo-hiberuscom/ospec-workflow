@@ -28,13 +28,13 @@ Use OpenSpec as the artifact store. Read and write project artifacts directly fr
 
 Execute all steps from the skill directly in this context window:
 1. Read all change artifacts (required):
-	- `openspec/changes/{change-name}/proposal.md`
-	- `openspec/changes/{change-name}/specs/**/spec.md`
-	- `openspec/changes/{change-name}/design.md`
+	- `openspec/changes/{change-name}/proposal.md` or `openspec/changes/{change-name}/proposal-lite.md`
+	- `openspec/changes/{change-name}/specs/**/spec.md` (if present)
+	- `openspec/changes/{change-name}/design.md` (if present)
 	- `openspec/changes/{change-name}/tasks.md`
 	- `openspec/changes/{change-name}/apply-progress.md`
 	- `openspec/changes/{change-name}/verify-report.md`
-2. Confirm verification has no CRITICAL issues before archiving
+2. Confirm verification verdict is not `FAIL`; if it is `PASS WITH WARNINGS`, require accepted risks or explicit follow-up tasks before archiving
 3. Merge delta specs into `openspec/specs/` according to the OpenSpec archive rules
 4. Write `openspec/changes/{change-name}/archive-report.md` with the final closure summary and updated spec paths
 5. Move the change folder to `openspec/changes/archive/YYYY-MM-DD-{change-name}/`

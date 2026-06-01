@@ -38,9 +38,21 @@ From the orchestrator:
 ### Step 1: Load Skills
 Follow **Section A** from `skills/_shared/sdd-phase-common.md`.
 
-### Step 2: Read the Codebase
+### Step 2: Resolve Design Mode and Read Inputs
 
-Before designing, read the actual code that will be affected:
+Resolve the design mode before writing anything:
+
+| Mode | When to use it | Required inputs |
+|------|----------------|-----------------|
+| `design-after-spec` | One or more change-local specs already exist | Proposal + `openspec/changes/{change-name}/specs/**/spec.md` + codebase |
+| `design-from-proposal` | Specs do not exist yet | Proposal + codebase |
+
+Rules for mode selection:
+- If any change-local spec exists, you MUST use `design-after-spec` and read those specs before touching the design.
+- In `design-after-spec`, every MUST scenario needs an explicit design allocation: component, interface, file, flow, or rollout step.
+- In `design-from-proposal`, call out provisional assumptions so `sdd-spec` or `sdd-tasks` can reconcile them later.
+
+After resolving the mode, read the actual code that will be affected:
 - Entry points and module structure
 - Existing patterns and conventions
 - Dependencies and interfaces
@@ -158,6 +170,7 @@ Ready for tasks (sdd-tasks).
 ## Rules
 
 - ALWAYS read the actual codebase before designing — never guess
+- ALWAYS read change-local specs when they exist; `design-after-spec` is mandatory in that case
 - Every decision MUST have a rationale (the "why")
 - Include concrete file paths, not abstract descriptions
 - Use the project's ACTUAL patterns and conventions, not generic best practices
@@ -165,5 +178,5 @@ Ready for tasks (sdd-tasks).
 - Keep ASCII diagrams simple — clarity over beauty
 - Apply any `rules.design` from `openspec/config.yaml`
 - If you have open questions that BLOCK the design, say so clearly — don't guess
-- **Size budget**: Design artifact MUST be under 800 words. Architecture decisions as tables (option | tradeoff | decision). Code snippets only for non-obvious patterns.
+- **Size budget**: Design budget is elastic. Target 800 words for changes touching up to 3 modules, and allow up to 1200 words when the change crosses more than 3 modules or needs cross-cutting rollout detail. Architecture decisions as tables (option | tradeoff | decision). Code snippets only for non-obvious patterns.
 - Return envelope per **Section D** from `skills/_shared/sdd-phase-common.md`.
