@@ -1,5 +1,7 @@
 {
 	"name": "ospec-workflow",
 	"version": "1.0.0",
-	"description": "Spec-Driven Development workflow para Github Copilot custom agents - VScode"
+	"description": "Spec-Driven Development workflow para Github Copilot custom agents - VScode",
+	"agents": "agents/",
+	"skills": "skills/"
 }
