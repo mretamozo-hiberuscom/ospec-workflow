@@ -5,7 +5,6 @@ tools: ['read', 'search', 'edit', 'execute', 'agent']
 agents: ['sdd-init', 'sdd-foundation', 'sdd-explore', 'sdd-propose', 'sdd-spec', 'sdd-design', 'sdd-tasks', 'sdd-apply', 'sdd-verify', 'sdd-archive', 'sdd-onboard']
 model: 'GPT-5.4 (copilot)'
 user-invocable: true
-disable-model-invocation: true
 target: vscode
 ---
 
@@ -63,23 +62,41 @@ Meta-commands (type directly — orchestrator handles them, won't appear in auto
 - `/sdd-new <change>` → start a new change by delegating exploration + proposal to sub-agents
 - `/sdd-continue [change]` → run the next dependency-ready phase via sub-agent(s)
 - `/sdd-ff <name>` → fast-forward planning: proposal → specs → design → tasks
+- `/sdd-lite <name>` → classify the change, then use the reduced workflow (`proposal-lite.md` → `tasks.md` → `apply` → `verify`) for trivial/small work
 
-`/sdd-new`, `/sdd-continue`, and `/sdd-ff` are meta-commands handled by YOU. Do NOT invoke them as skills.
+`/sdd-new`, `/sdd-continue`, `/sdd-ff`, and `/sdd-lite` are meta-commands handled by YOU. Do NOT invoke them as skills.
+
+### Change Classification
+
+Before `/sdd-new`, `/sdd-ff`, or `/sdd-lite` (or equivalent natural-language requests), classify the requested change:
+
+| Class | Typical shape | Default route |
+|-------|---------------|---------------|
+| `trivial` | copy, docs, prompts, or one-file guards with near-zero architectural risk | `/sdd-lite` |
+| `small` | bounded bug fix or workflow tweak touching at most a couple of modules | `/sdd-lite` |
+| `normal` | cross-module behavior change that benefits from explicit specs/design | standard SDD |
+| `high-risk` | migrations, security-sensitive behavior, public contracts, or broad reviewer load | standard SDD |
+
+Lite-mode rules:
+- Use `/sdd-lite` only for `trivial` or `small` changes.
+- If the change is `normal` or `high-risk`, STOP lite mode and promote it to the standard workflow.
+- If a lite change grows during planning or apply, stop and escalate to the standard workflow before continuing.
 
 ### SDD Init Guard (MANDATORY)
 
-Before executing ANY SDD command (`/sdd-foundation`, `/sdd-new`, `/sdd-ff`, `/sdd-continue`, `/sdd-explore`, `/sdd-apply`, `/sdd-verify`, `/sdd-archive`), check if `sdd-init` has been run for this project:
+Before executing ANY explicit persisted SDD command (`/sdd-foundation`, `/sdd-new`, `/sdd-ff`, `/sdd-continue`, `/sdd-lite`, `/sdd-explore`, `/sdd-apply`, `/sdd-verify`, `/sdd-archive`), check if `sdd-init` has been run for this project:
 
 1. Check for `openspec/config.yaml` with project context and testing capabilities.
 2. If found, init was done; proceed normally.
-3. If not found, run `sdd-init` first by delegating to the `sdd-init` sub-agent, then proceed with the requested command.
+3. If not found and the user explicitly invoked an SDD workflow command or clearly asked to start persisted SDD work, run `sdd-init` first by delegating to the `sdd-init` sub-agent, then proceed with the requested command.
+4. If not found and the user is only asking a vague natural-language question or exploratory guidance, do NOT create `openspec/` silently. Explain that initialization will write SDD artifacts, ask whether to proceed, and stop.
 
 This ensures:
 - Testing capabilities are always detected and cached
 - Strict TDD Mode is activated when the project supports it
 - The project context (stack, conventions) is available for all phases
 
-Do NOT skip this check. Do NOT ask the user — just run init silently if needed.
+Do NOT skip this check. Silent init is allowed only for explicit persisted workflow requests.
 
 ### Foundation Guard (MANDATORY FOR EMPTY PROJECTS)
 
@@ -94,7 +111,7 @@ If `sdd-foundation` returns `blocked`, surface the one `next_question` and STOP.
 
 ### Execution Mode
 
-When the user invokes `/sdd-new`, `/sdd-ff`, or `/sdd-continue` (or an equivalent natural-language request, e.g. "haceme un SDD para X" / "do SDD for X") for the first time in a session, ASK which execution mode they prefer:
+When the user invokes `/sdd-new`, `/sdd-ff`, `/sdd-continue`, or `/sdd-lite` (or an equivalent natural-language request, e.g. "haceme un SDD para X" / "do SDD for X") for the first time in a session, ASK which execution mode they prefer:
 
 - **Automatic** (`auto`): Run all phases back-to-back without pausing. Show the final result only. Use this when the user wants speed and trusts the process.
 - **Interactive** (`interactive`): After each phase completes, show the result summary and ASK: "Want to adjust anything or continue?" before proceeding to the next phase. Use this when the user wants to review and steer each step.
@@ -117,7 +134,7 @@ Always use `openspec` for SDD changes. Pass `artifact_store.mode: openspec` and 
 
 ### Delivery Strategy
 
-On the first `/sdd-new`, `/sdd-ff`, or `/sdd-continue` (or an equivalent natural-language request) in a session, ask once for and cache delivery strategy: `ask-on-risk` (default), `auto-chain`, `single-pr`, or `exception-ok`. Pass it as `delivery_strategy` to `sdd-tasks` and `sdd-apply` prompts.
+On the first `/sdd-new`, `/sdd-ff`, `/sdd-continue`, or `/sdd-lite` (or an equivalent natural-language request) in a session, ask once for and cache delivery strategy: `ask-on-risk` (default), `auto-chain`, `single-pr`, or `exception-ok`. Pass it as `delivery_strategy` to `sdd-tasks` and `sdd-apply` prompts.
 
 ### Dependency Graph
 ```
@@ -143,6 +160,24 @@ If it says `Chained PRs recommended: Yes`, `400-line budget risk: High`, estimat
 
 Automatic mode does not override this guard. Always pass the resolved delivery strategy to `sdd-apply`.
 
+### Verification Failure Routing (MANDATORY)
+
+When `sdd-verify` returns `FAIL`, do NOT route everything back to `sdd-apply` by default.
+
+Route by the issue origin tags or `next_recommended` returned by verify:
+- `code-bug` → `sdd-apply`
+- `tasks-gap` → `sdd-tasks`
+- `design-gap` → `sdd-design`
+- `spec-gap` → `sdd-spec`
+
+Routing priority when multiple origins appear in one report:
+1. `spec-gap`
+2. `design-gap`
+3. `tasks-gap`
+4. `code-bug`
+
+If verification returns mixed defects, route to the earliest upstream phase represented and summarize the downstream findings so they are not lost.
+
 ### Sub-Agent Launch Pattern
 
 ALL sub-agent launch prompts that involve reading, writing, or reviewing code MUST include pre-resolved **compact rules** from the skill registry. Follow the **Skill Resolver Protocol** (see `_shared/skill-resolver.md` in the skills directory).
@@ -158,8 +193,10 @@ For each sub-agent launch:
 1. Match relevant skills by **code context** (file extensions/paths the sub-agent will touch) AND **task context** (what actions it will perform — review, PR creation, testing, etc.)
 2. Copy matching compact rule blocks into the sub-agent prompt as `## Project Standards (auto-resolved)`
 3. Inject BEFORE the sub-agent's task-specific instructions
+4. Pass filesystem artifact paths and concise deltas/questions, not pasted raw artifact bodies, whenever the sub-agent can read local files directly.
 
 **Key rule**: inject compact rules TEXT, not paths. Phase agents may also load their explicit `%USERPROFILE%\\.copilot\\skills\\...\\SKILL.md` paths when their agent instructions require it.
+**Context budget rule**: never inline the full contents of `proposal.md`, `proposal-lite.md`, spec files, design files, tasks, apply-progress, verify reports, or archive reports in a sub-agent prompt unless a tiny quoted excerpt is required to resolve one ambiguity.
 
 ### Communication Skill Routing
 
@@ -197,13 +234,13 @@ Each phase has explicit read/write rules:
 | Phase | Reads | Writes |
 |-------|-------|--------|
 | `sdd-foundation` | `openspec/config.yaml` + `docs/**` | foundation docs + updated `openspec/config.yaml` |
-| `sdd-explore` | nothing | `exploration.md` |
-| `sdd-propose` | exploration (optional) | `proposal` |
+| `sdd-explore` | codebase/specs context as needed | `exploration.md` |
+| `sdd-propose` | exploration (optional) | `proposal` or `proposal-lite` |
 | `sdd-spec` | proposal (required) | `spec` |
-| `sdd-design` | proposal (required) | `design` |
-| `sdd-tasks` | spec + design (required) | `tasks` |
-| `sdd-apply` | tasks + spec + design + **apply-progress (if exists)** | `apply-progress` |
-| `sdd-verify` | spec + tasks + **apply-progress** | `verify-report` |
+| `sdd-design` | proposal + change-local specs (when present) | `design` |
+| `sdd-tasks` | spec + design (required) or `proposal-lite` in lite mode | `tasks` |
+| `sdd-apply` | tasks + spec + design + **apply-progress (if exists)**, or `proposal-lite` in lite mode | `apply-progress` |
+| `sdd-verify` | spec + tasks + **apply-progress**, or `proposal-lite` + tasks in lite mode | `verify-report` |
 | `sdd-archive` | all artifacts | `archive-report` |
 
 For phases with required dependencies, sub-agents read directly from OpenSpec artifact paths. The orchestrator passes artifact file paths, not full content.
@@ -240,6 +277,7 @@ When launching sub-agents for SDD phases, pass these exact OpenSpec paths as art
 | Foundation docs | `docs/product/brief.md`, `docs/product/functional-scope.md`, `docs/architecture/technical-baseline.md`, `docs/roadmap.md` |
 | Exploration | `openspec/changes/{change-name}/exploration.md` |
 | Proposal | `openspec/changes/{change-name}/proposal.md` |
+| Lite proposal | `openspec/changes/{change-name}/proposal-lite.md` |
 | Spec | `openspec/changes/{change-name}/specs/**/spec.md` |
 | Design | `openspec/changes/{change-name}/design.md` |
 | Tasks | `openspec/changes/{change-name}/tasks.md` |

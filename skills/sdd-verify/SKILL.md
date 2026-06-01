@@ -22,14 +22,30 @@ Run when the orchestrator launches verification for an SDD change. You are the q
 
 ## Hard Rules
 
-- Read proposal, spec, design, and tasks before judging implementation.
-- Execute relevant tests; static analysis alone is never verification.
-- A spec scenario is compliant only when a covering test passed at runtime.
+- Read the available planning artifacts before judging implementation: `proposal.md` plus spec/design in standard mode, or `proposal-lite.md` in lite mode, alongside `tasks.md`.
+- Execute relevant tests when they exist; when runtime testing is immature, record the highest credible evidence level instead of collapsing everything into `UNTESTED`.
+- A spec scenario is compliant only when its evidence level meets the requirement strength defined in the spec.
 - Compare specs first, design second, task completion third.
+- In lite mode, compare `proposal-lite.md` first, then tasks, then implementation evidence.
 - Do not fix issues; report them for the orchestrator/user.
 - Persist `verify-report` according to mode: openspec file or inline-only for `none`.
 - If Strict TDD is active, load `strict-tdd-verify.md` from this skill directory; if inactive, never load it.
 - Return the Section D envelope from `../_shared/sdd-phase-common.md`.
+
+## Evidence Levels
+
+Classify each scenario with the strongest evidence you can prove:
+- `runtime-test`: automated test executed and passed successfully
+- `static-proof`: build, type-check, schema validation, or equivalent static command proves the behavior
+- `inspection-proof`: source inspection ties the scenario to concrete code paths with senior-level rationale
+- `manual-proof`: manual verification was performed and recorded in the environment
+- `no-proof`: no credible evidence was found
+
+Compliance rule matrix:
+- MUST scenarios require `runtime-test` or an accepted `static-proof`; anything lower is a CRITICAL defect.
+- SHOULD scenarios may pass with `inspection-proof`, but you MUST raise a WARNING.
+- MAY scenarios may pass with documented technical limitations and lower-tier evidence.
+- `no-proof` is always CRITICAL for MUST scenarios and a WARNING for SHOULD/MAY scenarios.
 
 ## Decision Gates
 
@@ -40,7 +56,9 @@ Run when the orchestrator launches verification for an SDD change. You are the q
 | Strict TDD false or no runner | Standard verify; skip TDD checks. |
 | Task incomplete | CRITICAL for core task, WARNING for cleanup task. |
 | Test command exits non-zero | CRITICAL. |
-| Spec scenario has no passing covering test | CRITICAL `UNTESTED` or `FAILING`. |
+| MUST scenario lacks `runtime-test` or accepted `static-proof` | CRITICAL. |
+| SHOULD scenario proved only by `inspection-proof` or `manual-proof` | WARNING. |
+| MAY scenario proved only by `inspection-proof` or `manual-proof` | WARNING unless team accepted the limitation. |
 | Design deviation exists | WARNING unless it breaks a spec. |
 
 ## Execution Steps
@@ -49,15 +67,16 @@ Run when the orchestrator launches verification for an SDD change. You are the q
 2. Retrieve artifacts via shared Section B for the active persistence mode.
 3. Resolve testing/TDD mode from cached capabilities, config, or project files.
 4. Count completed and incomplete tasks.
-5. Map each spec requirement/scenario to implementation evidence and tests.
+5. In standard mode, map each spec requirement/scenario to implementation evidence and tests. In lite mode, map each `proposal-lite.md` acceptance check to evidence.
 6. Check design decisions against changed code.
-7. Run test, build/type-check, and coverage commands when available.
-8. Build the behavioral compliance matrix from actual test results.
-9. Persist and return the verification report.
+7. Run test, build/type-check, coverage, and manual verification steps when available.
+8. Assign the strongest evidence level per scenario, then build the behavioral compliance matrix.
+9. Tag each CRITICAL/WARNING issue with a likely origin: `code-bug`, `tasks-gap`, `design-gap`, or `spec-gap`.
+10. Persist and return the verification report.
 
 ## Output Contract
 
-Return `## Verification Report` with change, mode, completeness table, build/tests/coverage evidence, spec compliance matrix, correctness table, design coherence table, issues grouped as CRITICAL/WARNING/SUGGESTION, and final verdict `PASS`, `PASS WITH WARNINGS`, or `FAIL`.
+Return `## Verification Report` with change, mode, completeness table, build/tests/coverage evidence, spec compliance matrix including evidence levels, correctness table, design coherence table, issues grouped as CRITICAL/WARNING/SUGGESTION with origin tags, and final verdict `PASS`, `PASS WITH WARNINGS`, or `FAIL`.
 
 ## References
 

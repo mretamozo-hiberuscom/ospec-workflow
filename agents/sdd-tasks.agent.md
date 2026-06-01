@@ -32,14 +32,16 @@ Also read shared conventions from the same skills root:
 Use OpenSpec as the artifact store. Read and write project artifacts directly from the filesystem under `openspec/changes/{change-name}/`. Use only filesystem OpenSpec artifacts for SDD state.
 
 Execute all steps from the skill directly in this context window:
-1. Read proposal artifact if present: `openspec/changes/{change-name}/proposal.md`
-2. Read spec artifacts (required): `openspec/changes/{change-name}/specs/**/spec.md`
-3. Read design artifact (required): `openspec/changes/{change-name}/design.md`
-4. Break down into hierarchically numbered tasks (`1.1`, `1.2`, `2.1`, etc.) grouped by phase
-5. Map tasks to files from the design's file-change table
-6. Add test-first RED/GREEN/TRIANGULATE/REFACTOR tasks when Strict TDD is active
-7. Include the review workload forecast near the top exactly as required by the SDD common protocol
-8. Write the tasks artifact to `openspec/changes/{change-name}/tasks.md`
+1. Read proposal artifact if present: `openspec/changes/{change-name}/proposal.md` or `openspec/changes/{change-name}/proposal-lite.md`
+2. In full mode, read spec artifacts (required): `openspec/changes/{change-name}/specs/**/spec.md`
+3. In full mode, read design artifact (required): `openspec/changes/{change-name}/design.md`
+4. In lite mode, confirm `proposal-lite.md` is sufficient; otherwise stop with `blocked` and `escalate-to-standard-sdd`
+5. In full mode, build a `Spec/Design Reconciliation` matrix before writing tasks and stop with `blocked` if any MUST scenario is `missing-design`
+6. Break down into hierarchically numbered tasks (`1.1`, `1.2`, `2.1`, etc.) grouped by phase
+7. Map tasks to files from the design's file-change table or the lite proposal's affected areas
+8. Add test-first RED/GREEN/TRIANGULATE/REFACTOR tasks when Strict TDD is active
+9. Include the contract section and review workload forecast near the top exactly as required by the SDD common protocol
+10. Write the tasks artifact to `openspec/changes/{change-name}/tasks.md`
 
 The review workload forecast must include these lines near the top:
 

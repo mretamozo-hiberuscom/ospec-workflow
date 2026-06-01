@@ -26,6 +26,7 @@ Typical paths:
 - `openspec/changes/{change-name}/tasks.md`
 - `openspec/changes/{change-name}/apply-progress.md`
 - `openspec/changes/{change-name}/verify-report.md`
+- `openspec/changes/{change-name}/state.yaml`
 
 If `artifact_store.mode` is `none`, use only the context passed by the orchestrator and return the artifact inline.
 
@@ -36,6 +37,51 @@ Every phase that produces an artifact MUST persist it when mode is `openspec`. S
 ### OpenSpec mode
 
 Write the phase artifact to the path defined by the phase skill and `openspec-convention.md`. If the file already exists, read it first and update it instead of blindly overwriting.
+
+After persisting the phase artifact, you MUST also read-merge-update `openspec/changes/{change-name}/state.yaml` so recovery can resume from the filesystem without relying on chat history.
+
+Minimum state shape:
+
+```yaml
+change: "{change-name}"
+status: "planning | ready-for-apply | applying | ready-for-verify | verified | archived | blocked"
+last_updated: 2026-06-01T19:12:00Z
+blocking_questions: []
+phases:
+	proposal:
+		status: "done | pending"
+		artifact: "openspec/changes/{change-name}/proposal.md"
+	spec:
+		status: "done | pending"
+		artifacts:
+			- "openspec/changes/{change-name}/specs/{domain}/spec.md"
+	design:
+		status: "done | pending"
+		artifact: "openspec/changes/{change-name}/design.md"
+	tasks:
+		status: "done | pending"
+		artifact: "openspec/changes/{change-name}/tasks.md"
+	apply:
+		status: "pending | partial | done"
+		artifact: "openspec/changes/{change-name}/apply-progress.md"
+	verify:
+		status: "pending | done"
+		artifact: "openspec/changes/{change-name}/verify-report.md"
+	archive:
+		status: "pending | done"
+		artifact: "openspec/changes/{change-name}/archive-report.md"
+```
+
+State update rules:
+- Preserve existing phase entries and artifact paths; update only the phase you just executed plus any top-level status that changes because of it.
+- Update `last_updated` with the current UTC timestamp every time you write a phase artifact or return `blocked`.
+- On `blocked`, set top-level `status: blocked` and record the blocking question(s) or reason in `blocking_questions`.
+- On successful `proposal`, `spec`, or `design`, keep top-level `status: planning` unless a later phase already advanced it.
+- On successful `tasks`, set `phases.tasks.status: done` and top-level `status: ready-for-apply`.
+- On `apply`, set `phases.apply.status: partial` for incomplete batches and `done` for a fully implemented batch. Top-level status becomes `applying` for partial progress or `ready-for-verify` when apply is complete.
+- On successful `verify`, set `phases.verify.status: done`. Use top-level `status: verified` for `PASS` and `PASS WITH WARNINGS`; stay `blocked` for `FAIL`.
+- On successful `archive`, set `phases.archive.status: done` and top-level `status: archived` before moving the folder.
+- Clear resolved entries from `blocking_questions` when the phase succeeds.
 
 ### None mode
 

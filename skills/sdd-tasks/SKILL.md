@@ -18,7 +18,7 @@ metadata:
 
 ## Purpose
 
-You are a sub-agent responsible for creating the TASK BREAKDOWN. You take the proposal, specs, and design, then produce a `tasks.md` with concrete, actionable implementation steps organized by phase.
+You are a sub-agent responsible for creating the TASK BREAKDOWN. You take the accepted behavior contract for the change (`proposal.md` + specs/design in full mode, or `proposal-lite.md` in lite mode), then produce a `tasks.md` with concrete, actionable implementation steps organized by phase.
 
 ## What You Receive
 
@@ -26,6 +26,7 @@ From the orchestrator:
 - Change name
 - Artifact store mode (`openspec | none`)
 - Delivery strategy (`ask-on-risk | auto-chain | single-pr | exception-ok`)
+- Planning mode (`full | lite`)
 
 ## Execution and Persistence Contract
 
@@ -39,7 +40,27 @@ From the orchestrator:
 ### Step 1: Load Skills
 Follow **Section A** from `skills/_shared/sdd-phase-common.md`.
 
-### Step 2: Analyze the Design
+### Step 2: Reconcile Specs and Design Before Writing Tasks
+
+If planning mode is `lite`:
+- Read `openspec/changes/{change-name}/proposal-lite.md` as the behavioral contract.
+- Confirm the change is still `trivial` or `small` and does not need dedicated spec/design artifacts.
+- Write `## Lite Change Contract` instead of `## Spec/Design Reconciliation`.
+- If the work no longer fits lite mode, STOP and return `blocked` with risk `escalate-to-standard-sdd`.
+
+If planning mode is `full`, follow the reconciliation rules below.
+
+Before writing tasks, build a mental matrix mapping every spec requirement/scenario to the design elements that implement it.
+
+Classify each scenario as:
+- `covered-by-design`: clear implementation path exists
+- `missing-design`: behavior is specified but no architectural allocation exists
+- `ambiguous`: contradiction or insufficient clarity between WHAT and HOW
+
+Reconciliation enforcement:
+1. If any MUST scenario is `missing-design`, STOP and return `status: blocked`.
+2. If SHOULD or MAY scenarios are `missing-design`, record a WARNING in the detailed summary and continue only if the core logic remains implementable.
+3. If a scenario is `ambiguous`, call out the ambiguity in the reconciliation section and only continue when the intended behavior can still be decomposed into verifiable work.
 
 From the design document, identify:
 - All files that need to be created/modified/deleted
@@ -65,6 +86,25 @@ openspec/changes/{change-name}/
 ```markdown
 # Tasks: {Change Title}
 
+## Lite Change Contract
+
+- Change class: {trivial | small}
+- Behavioral contract: {one-line summary from `proposal-lite.md`}
+- Acceptance checks: {brief list}
+- Escalation trigger: {what would force full SDD}
+
+## Spec/Design Reconciliation
+
+| Requirement / Scenario | Priority | Design Allocation | Status | Notes |
+|------------------------|----------|-------------------|--------|-------|
+| {REQ-01 / Scenario A} | MUST | `path/to/file.ext`, {interface or flow} | covered-by-design | {brief note} |
+| {REQ-02 / Scenario B} | SHOULD | (none) | missing-design | {warning or blocker} |
+
+### Reconciliation Verdict
+- MUST coverage: {complete | blocked}
+- SHOULD/MAY gaps: {none | summary}
+- Ambiguities to track: {none | summary}
+
 ## Review Workload Forecast
 
 | Field | Value |
@@ -87,6 +127,12 @@ Chain strategy: <stacked-to-main|feature-branch-chain|size-exception|pending>
 |------|------|-----------|-------|
 | 1 | <standalone deliverable> | PR 1 | <base branch; tests/docs included> |
 | 2 | <standalone deliverable> | PR 2 | <immediate parent/base branch boundary; depends on PR 1 or independent> |
+
+### Checklist Status Legend
+
+- `[ ]` Not implemented yet
+- `[~]` Implemented but not yet verified locally
+- `[x]` Implemented and verified locally
 
 ## Phase 1: {Phase Name} (e.g., Infrastructure / Foundation)
 
@@ -123,6 +169,11 @@ Each task MUST be:
 | **Actionable** | "Add `ValidateToken()` method to `AuthService`" | "Handle tokens" |
 | **Verifiable** | "Test: `POST /login` returns 401 without token" | "Make sure it works" |
 | **Small** | One file or one logical unit of work | "Implement the feature" |
+
+Checklist semantics:
+- Use `[ ]` for untouched work.
+- Use `[~]` only when implementation exists but local verification is still pending.
+- Use `[x]` only after the task is completed and verified locally.
 
 ### Review Workload Forecast Rules
 
@@ -209,6 +260,11 @@ Return to the orchestrator:
 | Phase 3 | {N} | {Phase name} |
 | Total | {N} | |
 
+### Reconciliation
+- MUST scenarios blocked: {0 or list}
+- SHOULD/MAY gaps: {none or summary}
+- Ambiguous scenarios: {none or summary}
+
 ### Implementation Order
 {Brief description of the recommended order and why}
 
@@ -228,12 +284,15 @@ Return to the orchestrator:
 
 - ALWAYS reference concrete file paths in tasks
 - Tasks MUST be ordered by dependency — Phase 1 tasks shouldn't depend on Phase 2
-- Testing tasks should reference specific scenarios from the specs
+- Testing tasks should reference specific scenarios from the specs, or `proposal-lite.md` acceptance checks in lite mode
 - Each task should be completable in ONE session (if a task feels too big, split it)
 - Use hierarchical numbering: 1.1, 1.2, 2.1, 2.2, etc.
 - NEVER include vague tasks like "implement feature" or "add tests"
+- In full mode, ALWAYS emit `## Spec/Design Reconciliation` before the backlog. If any MUST scenario is `missing-design`, return `blocked` instead of writing `tasks.md`.
+- In lite mode, emit `## Lite Change Contract` instead of the reconciliation matrix and use `proposal-lite.md` as the contract.
+- If lite planning reveals normal/high-risk scope or a need for dedicated specs/design, STOP and return `blocked` with `escalate-to-standard-sdd`.
 - Apply any `rules.tasks` from `openspec/config.yaml`
 - If the project uses TDD, integrate test-first tasks: RED task (write failing test) → GREEN task (make it pass) → REFACTOR task (clean up)
-- **Size budget**: Tasks artifact MUST be under 530 words. Each task: 1-2 lines max. Use checklist format, not paragraphs.
+- **Size budget**: Tasks budget is elastic. Target 530 words for straightforward single-PR plans; allow up to 900 words when chained flows, reconciliation details, or split work units require it. Each task: 1-2 lines max. Use checklist format, not paragraphs.
 - **Review workload guard**: ALWAYS include the Review Workload Forecast. If likely above 400 changed lines, recommend chained PRs and honor the received delivery strategy for whether a decision/exception is needed before apply.
 - Return envelope per **Section D** from `skills/_shared/sdd-phase-common.md`.

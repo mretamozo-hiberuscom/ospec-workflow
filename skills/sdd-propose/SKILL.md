@@ -26,6 +26,7 @@ From the orchestrator:
 - Change name (e.g., "add-dark-mode")
 - Exploration analysis (from sdd-explore) OR direct user description
 - Artifact store mode (`openspec | none`)
+- Proposal mode (`standard | lite`)
 
 ## Execution and Persistence Contract
 
@@ -46,7 +47,7 @@ Follow **Section A** from `skills/_shared/sdd-phase-common.md`.
 
 ```
 openspec/changes/{change-name}/
-└── proposal.md
+└── proposal.md | proposal-lite.md
 ```
 
 **IF mode is `none`:** Do NOT create any `openspec/` directories. Skip this step.
@@ -57,7 +58,13 @@ openspec/changes/{change-name}/
 
 **IF mode is `none`:** Skip — no existing specs to read.
 
-### Step 4: Write proposal.md
+### Step 4: Write the Proposal Artifact
+
+Choose the artifact by proposal mode:
+- `standard` → `proposal.md`
+- `lite` → `proposal-lite.md`
+
+#### Standard proposal (`proposal.md`)
 
 ```markdown
 # Proposal: {Change Title}
@@ -85,7 +92,9 @@ Be specific about the user need or technical debt being addressed.}
 > Research `openspec/specs/` before filling this in.
 
 ### New Capabilities
-<!-- Capabilities being introduced. Each becomes a new `openspec/specs/<name>/spec.md`.
+<!-- Capabilities being introduced. Each becomes a new change-local full spec at
+     `openspec/changes/{change-name}/specs/<name>/spec.md` and is promoted into
+     `openspec/specs/<name>/spec.md` only during archive.
      Use kebab-case names (e.g., user-auth, data-export, api-rate-limiting).
      Leave empty if no new capabilities. -->
 - `<capability-name>`: <brief description of what this capability covers>
@@ -127,13 +136,50 @@ Reference the recommended approach from exploration if available.}
 - [ ] {Measurable outcome}
 ```
 
+#### Lite proposal (`proposal-lite.md`)
+
+Use this only for `trivial` or `small` changes that do not justify full specs and design artifacts.
+
+```markdown
+# Proposal Lite: {Change Title}
+
+## Change Class
+
+{trivial | small}
+
+## Intent
+
+{One short paragraph describing the problem and desired outcome.}
+
+## Boundaries
+
+- In scope: {tight, concrete change}
+- Out of scope: {what would force escalation to full SDD}
+
+## Affected Areas
+
+| Area | Impact | Notes |
+|------|--------|-------|
+| `path/to/file` | Modify | {brief reason} |
+
+## Acceptance Checks
+
+- [ ] {specific observable behavior or local verification check}
+- [ ] {second bounded check if needed}
+
+## Risks and Rollback
+
+- Risk: {Low/Medium/High} — {main concern}
+- Rollback: {single-step rollback or revert strategy}
+```
+
 ### Step 5: Persist Artifact
 
 **This step is MANDATORY — do NOT skip it.**
 
 Follow **Section C** from `skills/_shared/sdd-phase-common.md`.
 - artifact: `proposal`
-- path: `openspec/changes/{change-name}/proposal.md`
+- path: `openspec/changes/{change-name}/proposal.md` or `openspec/changes/{change-name}/proposal-lite.md`
 
 ### Step 6: Return Summary
 
@@ -143,7 +189,7 @@ Return to the orchestrator:
 ## Proposal Created
 
 **Change**: {change-name}
-**Location**: `openspec/changes/{change-name}/proposal.md` (openspec) | inline (none)
+**Location**: `openspec/changes/{change-name}/proposal.md` or `openspec/changes/{change-name}/proposal-lite.md` (openspec) | inline (none)
 
 ### Summary
 - **Intent**: {one-line summary}
@@ -157,16 +203,17 @@ Ready for specs (sdd-spec) or design (sdd-design).
 
 ## Rules
 
-- In `openspec` mode, ALWAYS create the `proposal.md` file
-- If the change directory already exists with a proposal, READ it first and UPDATE it
+- In `openspec` mode, ALWAYS create the correct artifact for the requested mode: `proposal.md` for standard or `proposal-lite.md` for lite
+- If the change directory already exists with the target proposal artifact, READ it first and UPDATE it
 - Keep the proposal CONCISE - it's a thinking tool, not a novel
 - Every proposal MUST have a rollback plan
 - Every proposal MUST have success criteria
 - Use concrete file paths in "Affected Areas" when possible
 - Apply any `rules.proposal` from `openspec/config.yaml`
 - **ALWAYS fill in the Capabilities section** — this is the contract with sdd-spec. Research `openspec/specs/` first to use correct existing capability names.
-- New Capabilities → each will become `openspec/specs/<name>/spec.md` (new full spec)
+- New Capabilities → each will become `openspec/changes/{change-name}/specs/<name>/spec.md` until archive promotes them
 - Modified Capabilities → each will become a delta spec in the change folder
 - If nothing changes at the spec level (pure refactor, config change), explicitly write "None" under both sub-sections — don't leave them as template placeholders
-- **Size budget**: Proposal artifact MUST be under 450 words. Use bullet points and tables over prose. Headers organize, not explain.
+- `proposal-lite.md` is valid only for `trivial` or `small` changes. If the work needs full capabilities, spec deltas, or architecture decisions, escalate to standard mode.
+- **Size budget**: Standard proposals target 450 words or less. Lite proposals target 250 words or less. Use bullet points and tables over prose.
 - Return envelope per **Section D** from `skills/_shared/sdd-phase-common.md`.
