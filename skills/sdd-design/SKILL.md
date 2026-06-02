@@ -31,6 +31,7 @@ From the orchestrator:
 > Follow **Section B** (retrieval) and **Section C** (persistence) from `skills/_shared/sdd-phase-common.md`.
 
 - **openspec**: Read and follow `skills/_shared/openspec-convention.md`.
+- In `openspec` mode, treat `openspec/changes/{change-name}/state.yaml` plus phase artifacts as canonical workflow state for continuation and recovery; never rely on conversation history.
 - **none**: Return result only. Never create or modify project files.
 
 ## What to Do

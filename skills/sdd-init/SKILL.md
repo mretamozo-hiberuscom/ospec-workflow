@@ -24,6 +24,7 @@ Run this phase when the orchestrator/user asks to initialize SDD in a project. Y
 
 - Detect the real stack, conventions, architecture, testing tools, and persistence mode; never guess.
 - In `openspec` mode, follow `../_shared/openspec-convention.md` and write file artifacts.
+- In `openspec` mode, treat OpenSpec files on disk as canonical workflow state for continuation and recovery; never rely on conversation history.
 - In `none` mode, return detected context only; write no SDD artifacts except the registry if required.
 - Always persist testing capabilities in `openspec/config.yaml` `testing:` when mode is `openspec`.
 - Always build `.atl/skill-registry.md`.
@@ -51,7 +52,15 @@ Run this phase when the orchestrator/user asks to initialize SDD in a project. Y
 
 ## Output Contract
 
-Return `status`, `executive_summary`, `artifacts`, `next_recommended`, and `risks`. Include project, stack, persistence mode, Strict TDD status, testing capability table, saved paths, registry path, and next step: `sdd-foundation` for empty projects, otherwise `/sdd-explore` or `/sdd-new`.
+Return a structured result with these fields:
+- `status`: `success` | `blocked` | `partial`
+- `executive_summary`: one-sentence description of what was initialized
+- `artifacts`: OpenSpec paths and registry paths written
+- `next_recommended`: `sdd-foundation` for empty projects, otherwise `sdd-explore` or `sdd-new`
+- `risks`: warnings about detected stack, Strict TDD status, or persistence setup
+- `skill_resolution`: `injected`, `fallback-registry`, `fallback-path`, or `none`
+
+Include project, stack, persistence mode, Strict TDD status, testing capability table, and saved paths in the detailed body.
 
 ## References
 

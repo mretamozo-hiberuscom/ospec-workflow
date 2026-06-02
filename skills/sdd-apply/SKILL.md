@@ -34,6 +34,7 @@ From the orchestrator:
 > Follow **Section B** (retrieval) and **Section C** (persistence) from `skills/_shared/sdd-phase-common.md`.
 
 - **openspec**: Read and follow `skills/_shared/openspec-convention.md`. Update `tasks.md` with `[~]` or `[x]` marks and save progress to `apply-progress.md`.
+- In `openspec` mode, treat `openspec/changes/{change-name}/state.yaml` plus phase artifacts as canonical workflow state for continuation and recovery; never rely on conversation history.
 - **none**: Return progress only. Do not update project artifacts.
 
 ## What to Do

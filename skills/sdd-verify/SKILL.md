@@ -23,6 +23,7 @@ Run when the orchestrator launches verification for an SDD change. You are the q
 ## Hard Rules
 
 - Read the available planning artifacts before judging implementation: `proposal.md` plus spec/design in standard mode, or `proposal-lite.md` in lite mode, alongside `tasks.md`.
+- In `openspec` mode, treat `openspec/changes/{change-name}/state.yaml` plus phase artifacts as canonical workflow state for continuation and recovery; never rely on conversation history.
 - Execute relevant tests when they exist; when runtime testing is immature, record the highest credible evidence level instead of collapsing everything into `UNTESTED`.
 - A spec scenario is compliant only when its evidence level meets the requirement strength defined in the spec.
 - Compare specs first, design second, task completion third.

@@ -211,6 +211,7 @@ Small tweaks? Just code. Features, APIs, architecture decisions? SDD first.
 ## Rules
 
 - This is a REAL change — not a demo. The artifacts and code must be production-quality.
+- In `openspec` mode, treat `openspec/changes/{change-name}/state.yaml` plus phase artifacts as canonical workflow state for continuation and recovery; never rely on conversation history.
 - Keep each phase narration SHORT — 1-3 sentences. Teach, don't lecture.
 - Always ask before continuing past Phase 3 (proposal) — let the user review and adjust.
 - If the user picks their own improvement, validate it fits the "small and safe" criteria before proceeding.
@@ -218,3 +219,13 @@ Small tweaks? Just code. Features, APIs, architecture decisions? SDD first.
 - Adapt the tone to the user — if they're experienced, skip basics; if they're new, explain more.
 - Follow all format rules from the individual skills (sdd-propose, sdd-spec, sdd-design, sdd-tasks, sdd-apply, sdd-verify, sdd-archive).
 - Return envelope per **Section D** from `skills/_shared/sdd-phase-common.md`.
+
+## Output Contract
+
+Return a structured result with these fields:
+- `status`: `success` | `blocked` | `partial`
+- `executive_summary`: one-sentence description of what was onboarded
+- `artifacts`: OpenSpec paths written for the onboarding change
+- `next_recommended`: `sdd-foundation` if blocked for empty project, otherwise `sdd-new`
+- `risks`: onboarding warnings or blockers discovered during the guided cycle
+- `skill_resolution`: `injected`, `fallback-registry`, `fallback-path`, or `none`

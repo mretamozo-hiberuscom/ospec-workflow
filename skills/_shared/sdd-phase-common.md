@@ -17,6 +17,8 @@ NOTE: the preferred path is (1) — compact rules pre-injected by the orchestrat
 
 If `artifact_store.mode` is `openspec`, read the phase-specific dependencies from `openspec/` before producing output.
 
+OpenSpec files on disk are the canonical workflow state. Do not treat chat memory or conversation history as authoritative when the artifacts exist.
+
 Typical paths:
 - `openspec/config.yaml`
 - `openspec/specs/**/spec.md`

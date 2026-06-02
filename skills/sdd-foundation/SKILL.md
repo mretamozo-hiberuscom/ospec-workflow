@@ -22,6 +22,7 @@ Run this phase when a project has `openspec/config.yaml` but little or no detect
 
 - Treat this as pre-SDD foundation work, not implementation. Do not create application code.
 - Read `openspec/config.yaml` first. If it is missing, stop and request `sdd-init`.
+- In persisted mode, treat OpenSpec files on disk as canonical workflow state for continuation and recovery; never rely on conversation history.
 - Ask at most one blocking question at a time; after asking it, stop.
 - Persist only confirmed or document-backed facts. Mark unknowns explicitly; never invent product, stack, commands, or architecture.
 - Persist confirmed partial answers before returning `blocked`; foundation discovery must survive context loss.

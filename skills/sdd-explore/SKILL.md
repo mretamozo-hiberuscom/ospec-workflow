@@ -31,6 +31,7 @@ The orchestrator will give you:
 > Follow **Section B** (retrieval) and **Section C** (persistence) from `skills/_shared/sdd-phase-common.md`.
 
 - **openspec**: Read and follow `skills/_shared/openspec-convention.md`. Save artifact as `openspec/changes/{change-name}/exploration.md` when tied to a named change.
+- In named `openspec` explorations, treat `openspec/changes/{change-name}/state.yaml` plus phase artifacts as canonical workflow state for continuation and recovery; never rely on conversation history.
 - **none**: Return result only.
 
 ### Retrieving Context
