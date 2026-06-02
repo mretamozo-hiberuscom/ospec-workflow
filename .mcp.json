@@ -9,6 +9,13 @@
 			"env": {
 				"CONTEXT7_API_KEY": "${input:CONTEXT7_API_KEY}"
 			}
+		},
+		"microsoft/markitdown": {
+			"type": "stdio",
+			"command": "uvx",
+			"args": [
+				"markitdown-mcp@0.0.1a4"
+			]
 		}
 	}
 }

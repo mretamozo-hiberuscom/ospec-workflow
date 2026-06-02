@@ -1,13 +1,13 @@
 {
 	"name": "ospec-workflow",
 	"description": "Spec-Driven Development workflow for VS Code Agent Customization with OpenSpec, strict TDD, phase agents, skills, and verification contracts.",
-	"version": "1.1.0",
+	"version": "2.0.0",
 	"author": {
 		"name": "Manuel Michael Retamozo García"
 	},
 	"agents": "agents/",
 	"commands": "commands/",
 	"skills": "skills/",
-	"mcpServers": ".mcp.json",
-	"hooks": "hooks.json"
+	"rules": "rules/",
+	"mcpServers": ".mcp.json"
 }
