@@ -2,7 +2,7 @@
 name: sdd-spec
 description: 'Write SDD requirements and scenarios as new or delta OpenSpec specs.'
 tools: ['read', 'search', 'edit']
-model: 'GPT-5.3-Codex (copilot)'
+model: 'Qwen 3.6 MSC1 (customendpoint)'
 user-invocable: false
 target: vscode
 ---

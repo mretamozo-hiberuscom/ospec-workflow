@@ -2,7 +2,7 @@
 name: sdd-explore
 description: 'Explore an SDD idea by investigating current code, options, risks, and a recommended approach.'
 tools: ['read', 'search', 'edit']
-model: 'GPT-5.3-Codex (copilot)'
+model: 'Qwen 3.6 MSC1 (customendpoint)'
 user-invocable: false
 target: vscode
 ---
