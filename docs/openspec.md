@@ -81,6 +81,26 @@ La regla critica esta en MODIFIED: copiar el requisito completo desde la spec pr
 
 Ademas, cada fase que persiste artefactos debe leer, fusionar y actualizar `openspec/changes/{change-name}/state.yaml`. La recuperacion depende de ese archivo; no es un detalle opcional.
 
+```yaml
+change:
+  name: add-export-csv
+  mode: standard
+  current_phase: apply
+
+approvals:
+  - id: delivery-strategy-001
+    gate: delivery-strategy
+    decision: ask-on-risk
+    source: vscode/askQuestions
+    accepted_at: 2026-06-10T10:30:00+02:00
+
+runtime:
+  skill_registry_fingerprint: sha256:abc123
+  last_skill_resolution: injected
+  last_session_summary: .ospec/session/add-export-csv/session-summary.md
+  compaction_safe: true
+```
+
 ## Archivo
 
 Al cerrar un cambio:

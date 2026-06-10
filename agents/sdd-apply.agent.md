@@ -38,5 +38,10 @@ Return a structured result with these fields:
 - `next_recommended`: `sdd-verify` (if all tasks done) or `sdd-apply` again (if tasks remain)
 - `risks`: deviations from design, unexpected complexity, or blocked tasks
 - `skill_resolution`: `injected`, `fallback-registry`, `fallback-path`, or `none`
+- `runtime_observability`: optional hook/cache observations relevant to continuation
+- `approval_updates`: approval ledger entries that must be persisted by the orchestrator
 
 If you need user input, do NOT ask the user directly. Return `status: blocked` with `question_gate` or `next_question`. The orchestrator will ask the user through `vscode/askQuestions` and relaunch you with the answer.
+
+Do not treat conversation history as approval evidence.
+If a blocking decision is required, return `status: blocked` with `question_gate`.

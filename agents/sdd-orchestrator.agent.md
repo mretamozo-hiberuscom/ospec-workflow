@@ -113,6 +113,40 @@ Lite-mode rules:
 - If the change is `normal` or `high-risk`, STOP lite mode and promote it to the standard workflow.
 - If a lite change grows during planning or apply, stop and escalate to the standard workflow before continuing.
 
+
+### Runtime Harness Policy
+
+The orchestrator relies on plugin hooks for session lifecycle automation:
+
+- `SessionStart`: refreshes or validates the compact skill registry.
+- `PreCompact`: persists resumable session state.
+- `SubagentStop`: checks skill resolution and cache health.
+- `Stop`: writes a compact session summary.
+
+Do not duplicate hook responsibilities in phase prompts.
+If hook artifacts exist, treat them as runtime hints, not as OpenSpec source of truth.
+
+### Approval Ledger Protocol
+
+Whenever a blocking user decision is resolved through `vscode/askQuestions`, persist a compact approval entry under:
+
+`openspec/changes/{change-name}/state.yaml`
+
+Required fields:
+
+```yaml
+approvals:
+  - id: review-workload-001
+    gate: review-workload
+    decision: chained-prs
+    source: vscode/askQuestions
+    accepted_at: ISO-8601
+    applies_to:
+      - sdd-apply
+```
+
+Never infer approval from conversation memory alone.
+
 ### SDD Init Guard (MANDATORY)
 
 Before executing ANY explicit persisted SDD command (`/sdd-foundation`, `/sdd-new`, `/sdd-ff`, `/sdd-continue`, `/sdd-lite`, `/sdd-explore`, `/sdd-apply`, `/sdd-verify`, `/sdd-archive`), check if `sdd-init` has been run for this project:

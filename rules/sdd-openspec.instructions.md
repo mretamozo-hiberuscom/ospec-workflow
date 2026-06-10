@@ -45,3 +45,30 @@ Default to `openspec` only when the orchestrator/user selected persisted artifac
 - `proposal-lite.md` is valid only for lite-mode changes. If the change escalates, keep it and create `proposal.md` for the full workflow.
 - Archive only after verification has no CRITICAL issues and any `PASS WITH WARNINGS` risks are explicitly accepted or converted into follow-up work.
 - The archive is an audit trail. Never delete archived changes.
+
+## Runtime hooks
+
+Plugin hooks may maintain cache, observability, session summaries, and tool safety checks.
+
+Hooks are support infrastructure. They must not replace OpenSpec as the canonical workflow state.
+
+## Prompt boundaries
+
+Dynamic payloads passed to agents must be clearly delimited:
+
+- `<user-intent>`
+- `<artifact-paths>`
+- `<project-standards>`
+- `<approval-context>`
+- `<runtime-hints>`
+
+Durable instructions must not be mixed with user-provided or generated payloads.
+
+## Approval evidence
+
+Blocking workflow decisions are valid only when they come from:
+
+1. `vscode/askQuestions` result in the current orchestration step; or
+2. an explicit approval entry persisted in `openspec/changes/{change-name}/state.yaml`.
+
+Do not infer approvals from plain chat summaries.
