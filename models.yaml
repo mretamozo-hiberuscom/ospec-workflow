@@ -28,13 +28,13 @@ agents:
 tiers:
   premium:
     claude: opus
-    vscode: ["Claude Opus 4.5 (copilot)", "GPT-5.5 (copilot)"]
+    vscode: ["Claude Opus 4.8 (copilot)", "GPT-5.5 (copilot)"]
     copilot-cli: inherit
   default:
     claude: sonnet
-    vscode: ["Claude Sonnet 4.5 (copilot)"]
+    vscode: ["Claude Sonnet 4.6 (copilot)", "GPT-5.3-Codex (copilot)"]
     copilot-cli: inherit
   cheap:
     claude: haiku
-    vscode: ["GPT-5-mini (copilot)", "Qwen 3.6 MSC1 (customendpoint)"]
+    vscode: ["Qwen 3.6 MSC1 (customendpoint)", "GPT-5.4-mini (copilot)"]
     copilot-cli: inherit
