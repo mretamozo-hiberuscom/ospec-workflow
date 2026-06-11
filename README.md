@@ -99,8 +99,7 @@ y validado en `dist/<target>/` sin tocar el origen:
 | Target | Salida |
 | --- | --- |
 | `vscode` | Identidad: el repositorio tal cual. |
-| `claude` | Renombra archivos, reestructura manifiesto y hooks, sustituye herramientas, reescribe variables de comando e incorpora `rules/` en el orquestador. Gate: `claude plugin validate --strict` 0/0. |
-| `copilot-cli` | Conserva sufijos, elimina `rules` del manifiesto y mapea la herramienta de preguntas. |
+| `claude` | Renombra archivos, reestructura manifiesto y hooks, sustituye herramientas (context-aware), reescribe variables de comando, incorpora `rules/` y emite el orquestador como **skill**. Gate: `claude plugin validate --strict` 0/0. |
 
 ```powershell
 node scripts/configure/cli.js --target claude --out dist/claude
@@ -109,6 +108,11 @@ node scripts/configure/cli.js --target claude --out dist/claude
 La transform es pura y testeada bajo Strict TDD; el CLI es la capa de IO con un gate de
 validación por target. La selección de modelo se abstrae en tiers (`models.yaml`). Consulta
 [model-routing.md](docs/model-routing.md) y la [guía de instalación](docs/plugin-installation.md).
+
+> **`copilot-cli` está planificado, no incluido aún.** GitHub Copilot CLI usa
+> `.github/agents/*.agent.md` + `.github/copilot-instructions.md` (no un árbol `.claude-plugin/`),
+> con su propio sistema de skills/MCP. Requiere su propio diseño y verificación empírica; ver las
+> Open Questions del diseño del cambio.
 
 ## MCP
 

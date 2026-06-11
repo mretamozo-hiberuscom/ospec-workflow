@@ -48,7 +48,7 @@ function handleFile(file, profile, models, rulesContent) {
     if (profile.orchestrator && profile.orchestrator.emitAs === "skill" && agentBaseName(path, profile) === profile.orchestrator.agent) {
       return emitOrchestratorSkill(file, profile, rulesContent);
     }
-    return handleAgent(file, profile, models, rulesContent);
+    return handleAgent(file, profile, models);
   }
 
   if (isCommand(path, profile)) {
@@ -66,7 +66,7 @@ function handleFile(file, profile, models, rulesContent) {
 // --- dispatch helpers ------------------------------------------------------
 
 function isInlineStrategy(strategy) {
-  return strategy === "inline-into-agent" || strategy === "inline-into-orchestrator";
+  return strategy === "inline-into-orchestrator";
 }
 
 function isRulesFile(path) {
@@ -170,7 +170,7 @@ function emitOrchestratorSkill(file, profile, rulesContent) {
 
 // --- agents ----------------------------------------------------------------
 
-function handleAgent(file, profile, models, rulesContent) {
+function handleAgent(file, profile, models) {
   const newPath = renameExtension(file.path, profile.agentFile);
   let { frontmatter, body } = parse(file.content);
   const nameField = getField(frontmatter, "name");
@@ -192,16 +192,6 @@ function handleAgent(file, profile, models, rulesContent) {
         ? setArray(frontmatter, "model", resolved)
         : setScalar(frontmatter, "model", resolved);
     }
-  }
-
-  // inline-into-agent (e.g. copilot-cli): fold rules into the orchestrator agent body.
-  if (
-    rulesContent &&
-    profile.rules &&
-    profile.rules.strategy === "inline-into-agent" &&
-    agentName === profile.rules.agent
-  ) {
-    body = body.replace(/\s*$/, "") + "\n\n" + rulesContent + "\n";
   }
 
   return { path: newPath, content: serialize({ frontmatter, body }) };

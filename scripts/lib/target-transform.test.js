@@ -5,7 +5,6 @@ const test = require("node:test");
 
 const { transform } = require("./target-transform.js");
 const claude = require("./target-profiles/claude.js");
-const copilotCli = require("./target-profiles/copilot-cli.js");
 const vscode = require("./target-profiles/vscode.js");
 const { parse, getField } = require("./frontmatter.js");
 
@@ -20,8 +19,8 @@ const MODELS = {
     _default: "default",
   },
   tiers: {
-    premium: { claude: "opus", vscode: ["Claude Opus 4.8 (copilot)"], "copilot-cli": "inherit" },
-    default: { claude: "sonnet", vscode: ["Claude Sonnet 4.6 (copilot)"], "copilot-cli": "inherit" },
+    premium: { claude: "opus", vscode: ["Claude Opus 4.8 (copilot)"] },
+    default: { claude: "sonnet", vscode: ["Claude Sonnet 4.6 (copilot)"] },
     cheap: { claude: "haiku" },
   },
 };
@@ -148,11 +147,11 @@ test("claude manifest omits string component paths and drops rules", () => {
   assert.equal(m.version, "2.1.0");
 });
 
-test("manifest reshaping is driven by the profile descriptor (copilot-cli keeps component paths, drops rules)", () => {
-  const out = transform({ files: makeSource(), profile: copilotCli, models: MODELS });
+test("vscode (identity) leaves the manifest untouched", () => {
+  const out = transform({ files: makeSource(), profile: vscode, models: MODELS });
   const m = JSON.parse(find(out, ".claude-plugin/plugin.json").content);
   assert.equal(m.agents, "agents/");
-  assert.ok(!("rules" in m));
+  assert.equal(m.rules, "rules/");
 });
 
 // ---------------------------------------------------------------------------
@@ -166,8 +165,8 @@ test("claude nests flat event entries preserving type/command/timeout", () => {
   assert.deepEqual(h.hooks.PreToolUse, [{ hooks: [{ type: "command", command: "node y.js", timeout: 5 }] }]);
 });
 
-test("copilot-cli leaves hooks flat (no nested shape)", () => {
-  const out = transform({ files: makeSource(), profile: copilotCli, models: MODELS });
+test("vscode leaves hooks flat (identity)", () => {
+  const out = transform({ files: makeSource(), profile: vscode, models: MODELS });
   const h = JSON.parse(find(out, "hooks/hooks.json").content);
   assert.deepEqual(h.hooks.SessionStart, [{ type: "command", command: "node x.js" }]);
 });
@@ -184,8 +183,8 @@ test("claude renames agent and command files to .md", () => {
   assert.ok(!find(out, "commands/sdd-apply.prompt.md"));
 });
 
-test("copilot-cli preserves the agent and command suffixes", () => {
-  const out = transform({ files: makeSource(), profile: copilotCli, models: MODELS });
+test("vscode preserves the agent and command suffixes (identity)", () => {
+  const out = transform({ files: makeSource(), profile: vscode, models: MODELS });
   assert.ok(find(out, "agents/sdd-apply.agent.md"));
   assert.ok(find(out, "commands/sdd-apply.prompt.md"));
 });
@@ -214,20 +213,8 @@ test("claude does NOT corrupt the generic word 'agent' in bare prose", () => {
   assert.doesNotMatch(agent, /phase Agent/);
 });
 
-test("copilot-cli maps the question tool to ask_user", () => {
-  const out = transform({ files: makeSource(), profile: copilotCli, models: MODELS });
-  const agent = find(out, "agents/sdd-apply.agent.md").content;
-  assert.match(agent, /Ask via `ask_user`/);
-});
-
 test("no vscode/ namespaced strings remain anywhere in a claude tree (agents, commands, skills, inlined rules)", () => {
   const out = transform({ files: makeSource(), profile: claude, models: MODELS });
-  const all = out.files.map((f) => f.content).join("\n");
-  assert.doesNotMatch(all, /vscode\//);
-});
-
-test("no vscode/ namespaced strings remain anywhere in a copilot-cli tree", () => {
-  const out = transform({ files: makeSource(), profile: copilotCli, models: MODELS });
   const all = out.files.map((f) => f.content).join("\n");
   assert.doesNotMatch(all, /vscode\//);
 });
@@ -280,12 +267,6 @@ test("claude strips target, user-invocable from agent frontmatter", () => {
   assert.equal(getField(fm, "user-invocable"), null);
 });
 
-test("copilot-cli strips the target key", () => {
-  const out = transform({ files: makeSource(), profile: copilotCli, models: MODELS });
-  const fm = parse(find(out, "agents/sdd-apply.agent.md").content).frontmatter;
-  assert.equal(getField(fm, "target"), null);
-});
-
 // ---------------------------------------------------------------------------
 // Requirement: Orchestrator Delivery (claude → skill)
 // ---------------------------------------------------------------------------
@@ -318,13 +299,6 @@ test("claude drops the rules dir (content inlined into the orchestrator skill)",
   assert.ok(!out.files.some((f) => f.path.startsWith("rules/")));
 });
 
-test("copilot-cli inlines rules into the orchestrator AGENT (its architecture stays agent-based)", () => {
-  const out = transform({ files: makeSource(), profile: copilotCli, models: MODELS });
-  assert.ok(!out.files.some((f) => f.path.startsWith("rules/")));
-  const orch = find(out, "agents/sdd-orchestrator.agent.md").content;
-  assert.match(orch, /ALWAYS use OpenSpec/);
-});
-
 test("vscode keeps the rules directory (identity transform)", () => {
   const out = transform({ files: makeSource(), profile: vscode, models: MODELS });
   assert.ok(out.files.some((f) => f.path === "rules/sdd-openspec.instructions.md"));
@@ -338,12 +312,6 @@ test("claude adds the resolved model alias to phase agents", () => {
   const out = transform({ files: makeSource(), profile: claude, models: MODELS });
   const fm = parse(find(out, "agents/sdd-apply.md").content).frontmatter;
   assert.equal(getField(fm, "model").value, "sonnet");
-});
-
-test("copilot-cli omits model (inherit)", () => {
-  const out = transform({ files: makeSource(), profile: copilotCli, models: MODELS });
-  const fm = parse(find(out, "agents/sdd-apply.agent.md").content).frontmatter;
-  assert.equal(getField(fm, "model"), null);
 });
 
 test("vscode does not inject a model key (source intentionally omits it)", () => {

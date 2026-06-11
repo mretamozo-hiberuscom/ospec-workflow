@@ -73,9 +73,6 @@ nativo y validado en `dist/<target>/` sin tocar el origen.
 # Genera el árbol nativo para Claude Code (con gate de validación)
 node scripts/configure/cli.js --target claude --out dist/claude
 
-# GitHub Copilot CLI
-node scripts/configure/cli.js --target copilot-cli --out dist/copilot-cli
-
 # Omitir el validador (inspección rápida)
 node scripts/configure/cli.js --target claude --out dist/claude --no-validate
 ```
@@ -83,18 +80,22 @@ node scripts/configure/cli.js --target claude --out dist/claude --no-validate
 | Target | Qué hace el generador | Validación |
 | --- | --- | --- |
 | `vscode` | Identidad: el origen ya es VS Code, no se transforma. | No aplica. |
-| `claude` | Renombra `*.agent.md`/`*.prompt.md` → `*.md`, reestructura el manifiesto y los hooks (anidados), sustituye nombres de herramientas (prosa y frontmatter), reescribe variables de comando (`${input}` → `$ARGUMENTS`), añade `context: fork`, e incorpora `rules/` en el orquestador. | `claude plugin validate --strict` debe pasar 0/0; un error o aviso devuelve código distinto de cero. |
-| `copilot-cli` | Conserva los sufijos de archivo, elimina la clave `rules` del manifiesto y mapea la herramienta de preguntas a `ask_user`. | Sin validador propio por ahora. |
+| `claude` | Renombra `*.agent.md`/`*.prompt.md` → `*.md`, reestructura el manifiesto y los hooks (anidados), sustituye nombres de herramientas (context-aware: namespaced en toda la prosa, genéricos solo en backticks), reescribe variables de comando (`${input}` → `$ARGUMENTS`; `${input:name}` → `$name` + `arguments:`), incorpora `rules/` y emite el orquestador como **skill** (`skills/sdd-orchestrator/SKILL.md`). | `claude plugin validate --strict` debe pasar 0/0; un error o aviso devuelve código distinto de cero. |
 
 El origen nunca se modifica: tras cualquier número de ejecuciones, VS Code sigue cargando
 el repositorio tal cual. Trata `dist/` como salida de build (está en `.gitignore`).
+
+> **`copilot-cli` está planificado.** GitHub Copilot CLI carga agentes desde
+> `.github/agents/*.agent.md` (con `target: github-copilot`), reglas desde
+> `.github/copilot-instructions.md` y `.github/instructions/*.instructions.md`, y tiene su propio
+> sistema de skills/MCP — no consume un árbol `.claude-plugin/`. Necesita su propio profile de
+> salida y verificación contra el CLI real, por lo que se difiere a un cambio futuro.
 
 ### Instalar el árbol generado por herramienta
 
 - **VS Code**: usa el repositorio directamente (`chat.pluginLocations`), sin generar.
 - **Claude Code**: genera `dist/claude/` e instálalo como plugin local de Claude apuntando
   a esa carpeta (contiene su propio `.claude-plugin/plugin.json`).
-- **Copilot CLI**: genera `dist/copilot-cli/` e instálalo según el flujo de plugins de la CLI.
 
 ## Como verificar que cargaron los agentes y los skills
 

@@ -32,11 +32,15 @@ no escribe la clave `model:` y el host usa el modelo de la sesión.
 
 ### Tabla `tiers` → modelo por target
 
-| Tier | `claude` (alias) | `vscode` (orden de fallback) | `copilot-cli` |
-| --- | --- | --- | --- |
-| `premium` | `opus` | `Claude Opus 4.8 (copilot)`, `GPT-5.5 (copilot)` | `inherit` |
-| `default` | `sonnet` | `Claude Sonnet 4.6 (copilot)`, `GPT-5.3-Codex (copilot)` | `inherit` |
-| `cheap` | `haiku` | `Qwen 3.6 MSC1 (customendpoint)`, `GPT-5.4-mini (copilot)` | `inherit` |
+| Tier | `claude` (alias) | `vscode` (orden de fallback) |
+| --- | --- | --- |
+| `premium` | `opus` | `Claude Opus 4.8 (copilot)`, `GPT-5.5 (copilot)` |
+| `default` | `sonnet` | `Claude Sonnet 4.6 (copilot)`, `GPT-5.3-Codex (copilot)` |
+| `cheap` | `haiku` | `Qwen 3.6 MSC1 (customendpoint)`, `GPT-5.4-mini (copilot)` |
+
+`models.yaml` también lleva una columna `copilot-cli: inherit` por tier, reservada para el target
+`copilot-cli` planificado (ver el cambio de compatibilidad multi-target). Como `inherit` resuelve a
+OMIT, es inerte hasta que ese target exista.
 
 ## Formato del modelo por target
 
@@ -48,8 +52,8 @@ serializa en el frontmatter:
   siguen automáticamente el modelo más reciente, así que no hay IDs que mantener.
 - **`vscode`**: una lista `"Nombre (vendor)"` que actúa como **orden de preferencia**;
   VS Code usa el primero disponible. Admite vendors como `copilot` y `customendpoint`.
-- **`copilot-cli`**: `inherit` → OMIT. No se escribe `model:` y la CLI hereda el
-  modelo de la sesión, evitando la sintaxis aún poco especificada de GitHub.
+- **`copilot-cli`** (planificado): mapeará a `inherit` → OMIT (sin clave `model:`, hereda el modelo
+  de la sesión), evitando la sintaxis de modelo aún poco especificada de GitHub.
 
 ## Perfiles locales heredados
 

@@ -58,7 +58,7 @@ test("runConfigure writes a claude tree to the out dir", (t) => {
 test("the source fixture is left byte-for-byte unchanged", (t) => {
   const before = readTree(SOURCE);
   runConfigure({ sourceDir: SOURCE, target: "claude", outDir: tmpOut(t), validate: false });
-  runConfigure({ sourceDir: SOURCE, target: "copilot-cli", outDir: tmpOut(t), validate: false });
+  runConfigure({ sourceDir: SOURCE, target: "vscode", outDir: tmpOut(t), validate: false });
   const after = readTree(SOURCE);
 
   assert.deepEqual(after, before);
@@ -129,7 +129,7 @@ test("a clean validator run keeps a zero exit", (t) => {
 // Golden snapshots
 // ---------------------------------------------------------------------------
 
-for (const target of ["claude", "copilot-cli"]) {
+for (const target of ["claude"]) {
   test(`generated ${target} tree matches the committed golden`, (t) => {
     const out = tmpOut(t);
     runConfigure({ sourceDir: SOURCE, target, outDir: out, validate: false });
