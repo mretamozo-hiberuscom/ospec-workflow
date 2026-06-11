@@ -171,6 +171,14 @@ function createWorkspaceFederatedStore(workspace) {
         }
       }
 
+      // Hooks consume [0] as the active change, so order the union by recency
+      // across every source (newest first), tie-breaking by directory name.
+      aggregated.sort(
+        (left, right) =>
+          right.modifiedAt - left.modifiedAt ||
+          (left.directoryName < right.directoryName ? -1 : 1),
+      );
+
       // Skips are non-fatal observability, exposed without disturbing the array.
       Object.defineProperty(aggregated, "warnings", {
         value: warnings,

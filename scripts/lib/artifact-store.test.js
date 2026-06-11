@@ -218,6 +218,48 @@ test("workspace-federated: unions coordinator and member changes with source tag
   );
 });
 
+test("workspace-federated: orders aggregated changes by recency across members", async (t) => {
+  const workspace = await createWorkspace(t);
+
+  await writeAtlas(
+    workspace,
+    ["members:", "  - id: api", "    path: member-api"].join("\n"),
+  );
+  await writeChange(workspace, "rollout", "change:\n  status: planning\n");
+  await writeMemberChange(
+    workspace,
+    "member-api",
+    "add-endpoint",
+    "change:\n  status: applying\n",
+  );
+
+  const older = new Date("2026-06-10T08:00:00.000Z");
+  const newer = new Date("2026-06-10T12:00:00.000Z");
+  await fs.utimes(
+    path.join(workspace, "openspec", "changes", "rollout", "state.yaml"),
+    older,
+    older,
+  );
+  await fs.utimes(
+    path.join(
+      workspace,
+      "member-api",
+      "openspec",
+      "changes",
+      "add-endpoint",
+      "state.yaml",
+    ),
+    newer,
+    newer,
+  );
+
+  const store = createArtifactStore({ mode: "workspace-federated", workspace });
+  const active = await store.findActiveChanges();
+
+  assert.equal(active[0].source, "api");
+  assert.equal(active[0].directoryName, "add-endpoint");
+});
+
 test("workspace-federated: skips an unreachable member without throwing", async (t) => {
   const workspace = await createWorkspace(t);
 
