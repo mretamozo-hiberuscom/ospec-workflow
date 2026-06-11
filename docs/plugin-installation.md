@@ -14,8 +14,8 @@ El manifiesto del plugin es `.plugin/plugin.json`. Declara el paquete de trabajo
 | Archivos prompt | `commands/*.prompt.md` | Archivos prompt visibles para el usuario, como `/sdd-new`, `/sdd-apply` y `/sdd-verify`. |
 | Skills | `skills/` | Reglas reutilizables para fases SDD, revisiones, commits, documentacion y flujos relacionados. |
 | Instrucciones | `rules/` | Archivos de instrucciones incluidos en el plugin y generados por el flujo de creacion de plugins de VS Code. |
-| Servidores MCP | `.mcp.json` | Configuracion del servidor Context7 MCP usando `CONTEXT7_API_KEY`. |
-| Hooks | `hooks.json` y `scripts/hooks/` | Scripts locales de PowerShell para persistencia de sesion, validacion de uso de herramientas y comprobaciones de artefactos OpenSpec. |
+| Servidores MCP | `.mcp.json` | Configuracion de los servidores MCP: Context7 (docs de librerias, usa `CONTEXT7_API_KEY`) y MarkItDown (conversion de documentos). |
+| Hooks | `hooks/hooks.json` y `scripts/hooks/` | Scripts locales de Node.js para persistencia de sesion, validacion de uso de herramientas y comprobaciones de artefactos OpenSpec. |
 
 El directorio `.github/instructions/` es solo un espejo del workspace para archivos de instruccion. Las reglas incluidas en el plugin viven en `rules/`.
 
@@ -96,6 +96,7 @@ El plugin declara la configuracion MCP en `.mcp.json`.
 | Servidor MCP | Proposito | Entrada requerida |
 | --- | --- | --- |
 | `io.github.upstash/context7` | Busqueda de documentacion de librerias con Context7. | `CONTEXT7_API_KEY` |
+| `microsoft/markitdown` | Conversion de documentos (PDF/Office) a Markdown. | Ninguna (usa `uvx markitdown-mcp`). |
 
 Pasos de verificacion:
 
@@ -136,9 +137,9 @@ No borres los scripts de hooks solo para desactivar su ejecucion. Es preferible 
 | Faltan los archivos prompt | El plugin esta deshabilitado o no se cargaron los activos prompt. | Confirma que `.plugin/plugin.json` referencia `commands/` y que el plugin esta habilitado. |
 | Falta `sdd-orchestrator` | No se cargaron los activos de agentes. | Confirma que `.plugin/plugin.json` referencia `agents/` y que la vista de Agent Plugins no muestra errores. |
 | Los skills parecen no estar disponibles | No se cargaron los activos de skills o la peticion no activo un skill. | Confirma que `.plugin/plugin.json` referencia `skills/` y vuelve a probar con una peticion SDD. |
-| Falta el servidor MCP | MCP esta deshabilitado, bloqueado por la politica o no esta disponible en la version actual. | Revisa los ajustes de MCP/herramientas, la politica de la organizacion, Node.js y `npx`. |
+| Falta el servidor MCP | MCP esta deshabilitado, bloqueado por la politica o no esta disponible en la version actual. | Revisa los ajustes de MCP/herramientas, la politica de la organizacion, Node.js/`npx` (Context7) y `uv`/`uvx` (MarkItDown). |
 | Context7 pide una clave | Hace falta `CONTEXT7_API_KEY`. | Proporcionala desde el prompt de VS Code cuando confies en la ejecucion del servidor. |
-| Falla la ejecucion del hook | Problema de PowerShell, resolucion de rutas o politica de scripts. | Revisa `hooks.json`, la resolucion de `${PLUGIN_ROOT}` y los scripts de `scripts/hooks/`. |
+| Falla la ejecucion del hook | Problema con Node.js, resolucion de rutas o politica de scripts. | Confirma que Node.js esta en `PATH`, revisa `hooks/hooks.json`, la resolucion de `${PLUGIN_ROOT}` y los scripts de `scripts/hooks/`. |
 | No deben ejecutarse hooks | No se permite ejecucion local de codigo en este entorno. | Desactiva el plugin o usa una copia local sin hooks. |
 
 ## Politica de versionado
