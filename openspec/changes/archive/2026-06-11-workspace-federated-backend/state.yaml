@@ -1,7 +1,7 @@
 change: workspace-federated-backend
-status: ready-for-verify
+status: archived
 workflow: standard
-updated: 2026-06-11T04:30:00Z
+updated: 2026-06-11T04:45:00Z
 phases:
   explore:
     status: pending
@@ -25,9 +25,9 @@ phases:
     status: done
     artifact: apply-progress.md
   verify:
-    status: pending
+    status: done
     artifact: verify-report.md
   archive:
-    status: pending
+    status: done
     artifact: archive-report.md
 blocking_questions: []
