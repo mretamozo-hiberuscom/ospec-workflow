@@ -90,6 +90,26 @@ Los agentes no fijan nombres de modelos concretos. Por defecto heredan el modelo
 
 Los perfiles viven en `profiles/models/`. Consulta [model-routing.md](docs/model-routing.md).
 
+## Compatibilidad multi-target
+
+El origen canónico está en formato VS Code y se carga directamente, sin transformación.
+Para otros targets, un generador puro (`scripts/configure/cli.js`) produce un árbol nativo
+y validado en `dist/<target>/` sin tocar el origen:
+
+| Target | Salida |
+| --- | --- |
+| `vscode` | Identidad: el repositorio tal cual. |
+| `claude` | Renombra archivos, reestructura manifiesto y hooks, sustituye herramientas, reescribe variables de comando e incorpora `rules/` en el orquestador. Gate: `claude plugin validate --strict` 0/0. |
+| `copilot-cli` | Conserva sufijos, elimina `rules` del manifiesto y mapea la herramienta de preguntas. |
+
+```powershell
+node scripts/configure/cli.js --target claude --out dist/claude
+```
+
+La transform es pura y testeada bajo Strict TDD; el CLI es la capa de IO con un gate de
+validación por target. La selección de modelo se abstrae en tiers (`models.yaml`). Consulta
+[model-routing.md](docs/model-routing.md) y la [guía de instalación](docs/plugin-installation.md).
+
 ## MCP
 
 La configuración predeterminada se mantiene deliberadamente pequeña:

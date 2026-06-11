@@ -1,3 +1,12 @@
+---
+name: agent-introspection
+description: "Diagnose and recover a derailed agent run. Trigger: an agent loops, drifts, loses context, repeatedly fails, or burns tokens without progress."
+license: Apache-2.0
+metadata:
+  author: manuel-retamozo-garcia
+  version: "1.0"
+---
+
 # Agent Introspection
 
 Use this skill when an agent run is looping, drifting, losing context, repeatedly failing, or consuming tokens without progress.

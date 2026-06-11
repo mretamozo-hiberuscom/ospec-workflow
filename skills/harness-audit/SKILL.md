@@ -1,3 +1,12 @@
+---
+name: harness-audit
+description: "Inspect, debug, optimize, or harden the ospec workflow harness. Trigger: auditing the plugin manifest, agent boundaries, hooks, skills, or token efficiency."
+license: Apache-2.0
+metadata:
+  author: manuel-retamozo-garcia
+  version: "1.0"
+---
+
 # Harness Audit
 
 Use this skill when the user asks to inspect, debug, optimize, or harden the ospec workflow harness.
