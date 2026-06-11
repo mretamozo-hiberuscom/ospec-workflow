@@ -1,0 +1,13 @@
+# Local runtime caches and session hints (never the source of truth)
+.atl/
+.ospec/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
