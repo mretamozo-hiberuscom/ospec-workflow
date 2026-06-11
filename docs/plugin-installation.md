@@ -93,11 +93,12 @@ el repositorio tal cual. Trata `dist/` como salida de build (está en `.gitignor
 
 - **VS Code**: usa el repositorio directamente (`chat.pluginLocations`), sin generar.
 - **Claude Code**: genera `dist/claude/` e instálalo como plugin local de Claude apuntando
-  a esa carpeta (contiene su propio `.claude-plugin/plugin.json`).
-- **GitHub Copilot**: genera `dist/github-copilot/` y copia su `.github/` y `.mcp.json` en la raíz del
-  repo destino (agentes, prompts, instructions, hooks y MCP quedan donde Copilot CLI y el coding agent
-  los cargan). Los hooks referencian `scripts/hooks/*.js` de forma relativa al repo, así que el repo
-  destino debe incluir `scripts/`.
+  a esa carpeta. Es autocontenido: incluye `.claude-plugin/plugin.json` y el runtime de hooks bajo
+  `scripts/` (referenciado vía `${CLAUDE_PLUGIN_ROOT}`).
+- **GitHub Copilot**: genera `dist/github-copilot/` y copia su contenido (`.github/`, `.mcp.json` y
+  `scripts/`) en la raíz del repo destino. El árbol es **autocontenido**: el generador incluye el
+  runtime de los hooks (`scripts/hooks/*.js` + sus dependencias de `scripts/lib/`), resuelto siguiendo
+  los `require` desde los hooks, sin tests ni el propio generador.
 
 ## Como verificar que cargaron los agentes y los skills
 

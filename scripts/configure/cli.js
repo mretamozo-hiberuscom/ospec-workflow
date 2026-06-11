@@ -57,7 +57,57 @@ function loadTree(sourceDir, roots = SOURCE_ROOTS) {
       files.push({ path: root, content: fs.readFileSync(abs, "utf8") });
     }
   }
+  for (const script of gatherRuntimeScripts(sourceDir)) {
+    files.push(script);
+  }
   return files;
+}
+
+// The hooks invoke scripts/hooks/*.js, which require a subset of scripts/lib/*.js.
+// Walk the require graph from the hook entry points so the generated tree ships
+// exactly that runtime (self-contained dist) and nothing else — no test files and
+// no generator code (target-*, frontmatter, model-resolver, configure), which the
+// hooks never require. Static, dependency-free require resolution.
+function gatherRuntimeScripts(sourceDir) {
+  const hooksDir = path.join(sourceDir, "scripts", "hooks");
+  if (!fs.existsSync(hooksDir)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const out = [];
+  const queue = [];
+  for (const name of fs.readdirSync(hooksDir)) {
+    if (name.endsWith(".js") && !name.endsWith(".test.js")) {
+      queue.push("scripts/hooks/" + name);
+    }
+  }
+
+  const requireRe = /require\(\s*["'](\.[^"']+)["']\s*\)/g;
+  while (queue.length > 0) {
+    const rel = queue.shift();
+    if (seen.has(rel)) {
+      continue;
+    }
+    seen.add(rel);
+    const abs = path.join(sourceDir, rel);
+    if (!fs.existsSync(abs)) {
+      continue;
+    }
+    const content = fs.readFileSync(abs, "utf8");
+    out.push({ path: rel, content });
+
+    let match;
+    while ((match = requireRe.exec(content)) !== null) {
+      let dep = match[1];
+      if (!dep.endsWith(".js")) {
+        dep += ".js";
+      }
+      queue.push(path.posix.normalize(path.posix.join(path.posix.dirname(rel), dep)));
+    }
+  }
+
+  return out.sort((a, b) => a.path.localeCompare(b.path));
 }
 
 function writeTree(outDir, { files }) {
@@ -220,6 +270,7 @@ if (require.main === module) {
 
 module.exports = {
   loadTree,
+  gatherRuntimeScripts,
   writeTree,
   parseModels,
   runConfigure,

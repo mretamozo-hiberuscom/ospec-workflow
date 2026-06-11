@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { loadTree, parseModels, runConfigure } = require("./cli.js");
+const { loadTree, gatherRuntimeScripts, parseModels, runConfigure } = require("./cli.js");
 
 const FIXTURES = path.join(__dirname, "__fixtures__");
 const SOURCE = path.join(FIXTURES, "source");
@@ -147,6 +147,24 @@ for (const target of ["claude", "github-copilot"]) {
 // ---------------------------------------------------------------------------
 // loadTree + parseModels
 // ---------------------------------------------------------------------------
+
+test("gatherRuntimeScripts walks hook requires, excluding tests and generator code", (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(dir, "scripts/hooks"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "scripts/lib"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "scripts/hooks/start.js"), 'require("../lib/dep.js");\n');
+  fs.writeFileSync(path.join(dir, "scripts/hooks/start.test.js"), '// test, must not ship\n');
+  fs.writeFileSync(path.join(dir, "scripts/lib/dep.js"), "module.exports = {};\n");
+  fs.writeFileSync(path.join(dir, "scripts/lib/generator-only.js"), "// not required by hooks\n");
+
+  const paths = gatherRuntimeScripts(dir).map((f) => f.path);
+
+  assert.ok(paths.includes("scripts/hooks/start.js"));
+  assert.ok(paths.includes("scripts/lib/dep.js"));
+  assert.ok(!paths.includes("scripts/hooks/start.test.js"), "test files must be excluded");
+  assert.ok(!paths.includes("scripts/lib/generator-only.js"), "unreferenced (generator) files excluded");
+});
 
 test("loadTree reads the plugin source roots into {path, content}", () => {
   const files = loadTree(SOURCE);
