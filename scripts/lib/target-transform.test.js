@@ -6,6 +6,7 @@ const test = require("node:test");
 const { transform } = require("./target-transform.js");
 const claude = require("./target-profiles/claude.js");
 const vscode = require("./target-profiles/vscode.js");
+const githubCopilot = require("./target-profiles/github-copilot.js");
 const { parse, getField } = require("./frontmatter.js");
 
 // ---------------------------------------------------------------------------
@@ -318,4 +319,71 @@ test("vscode does not inject a model key (source intentionally omits it)", () =>
   const out = transform({ files: makeSource(), profile: vscode, models: MODELS });
   const fm = parse(find(out, "agents/sdd-apply.agent.md").content).frontmatter;
   assert.equal(getField(fm, "model"), null);
+});
+
+// ---------------------------------------------------------------------------
+// Target: github-copilot (.github/ layout)
+// ---------------------------------------------------------------------------
+
+test("github-copilot emits agents under .github/agents with target: github-copilot", () => {
+  const out = transform({ files: makeSource(), profile: githubCopilot, models: MODELS });
+  const agent = find(out, ".github/agents/sdd-apply.agent.md");
+  assert.ok(agent, "agent must be under .github/agents/");
+  assert.ok(!find(out, "agents/sdd-apply.agent.md"));
+  assert.ok(!find(out, "agents/sdd-apply.md"));
+  const fm = parse(agent.content).frontmatter;
+  assert.equal(getField(fm, "target").value, "github-copilot");
+  assert.equal(getField(fm, "model"), null); // no model injection
+});
+
+test("github-copilot keeps valid tool aliases and drops vscode/askQuestions from the grant", () => {
+  const out = transform({ files: makeSource(), profile: githubCopilot, models: MODELS });
+  const fm = parse(find(out, ".github/agents/sdd-apply.agent.md").content).frontmatter;
+  assert.deepEqual(getField(fm, "tools").value, ["read", "search", "edit"]);
+});
+
+test("github-copilot orchestrator stays a normal agent (not a skill)", () => {
+  const out = transform({ files: makeSource(), profile: githubCopilot, models: MODELS });
+  assert.ok(find(out, ".github/agents/sdd-orchestrator.agent.md"));
+  assert.ok(!find(out, "skills/sdd-orchestrator/SKILL.md"));
+});
+
+test("github-copilot emits prompts under .github/prompts, keeping ${input:..} and agent routing", () => {
+  const out = transform({ files: makeSource(), profile: githubCopilot, models: MODELS });
+  const cmd = find(out, ".github/prompts/sdd-apply.prompt.md");
+  assert.ok(cmd, "command must be under .github/prompts/");
+  assert.match(cmd.content, /\$\{input:changeName\}/); // prompt-file variable syntax preserved
+  const fm = parse(cmd.content).frontmatter;
+  assert.equal(getField(fm, "agent").value, "sdd-orchestrator"); // routing kept (valid here)
+  assert.equal(getField(fm, "target"), null); // not a prompt-file field
+});
+
+test("github-copilot turns rules into .github/instructions/*.instructions.md with applyTo", () => {
+  const out = transform({ files: makeSource(), profile: githubCopilot, models: MODELS });
+  const instr = find(out, ".github/instructions/sdd-openspec.instructions.md");
+  assert.ok(instr, "rule must become an instruction file");
+  assert.ok(!out.files.some((f) => f.path.startsWith("rules/")));
+  const fm = parse(instr.content).frontmatter;
+  assert.equal(getField(fm, "applyTo").value, "**");
+  assert.match(instr.content, /ALWAYS use OpenSpec/);
+});
+
+test("github-copilot drops plugin-only artifacts (manifest, hooks, skills)", () => {
+  const out = transform({ files: makeSource(), profile: githubCopilot, models: MODELS });
+  assert.ok(!find(out, ".claude-plugin/plugin.json"));
+  assert.ok(!find(out, "hooks/hooks.json"));
+  assert.ok(!out.files.some((f) => f.path.startsWith("skills/")));
+});
+
+test("no vscode/ namespaced strings remain anywhere in a github-copilot tree", () => {
+  const out = transform({ files: makeSource(), profile: githubCopilot, models: MODELS });
+  const all = out.files.map((f) => f.content).join("\n");
+  assert.doesNotMatch(all, /vscode\//);
+});
+
+test("github-copilot does not mutate the input collection", () => {
+  const input = makeSource();
+  const before = JSON.stringify(input);
+  transform({ files: input, profile: githubCopilot, models: MODELS });
+  assert.equal(JSON.stringify(input), before);
 });

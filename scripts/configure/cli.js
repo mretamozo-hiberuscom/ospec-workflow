@@ -14,8 +14,7 @@ const { transform } = require("../lib/target-transform.js");
 const PROFILES = {
   claude: require("../lib/target-profiles/claude.js"),
   vscode: require("../lib/target-profiles/vscode.js"),
-  // copilot-cli is deferred: GitHub Copilot CLI uses .github/agents/*.agent.md +
-  // .github/copilot-instructions.md, not a .claude-plugin tree. See design.md.
+  "github-copilot": require("../lib/target-profiles/github-copilot.js"),
 };
 
 // Source roots that make up a plugin tree. Files are read into the

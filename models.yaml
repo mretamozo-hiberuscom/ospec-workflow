@@ -5,8 +5,8 @@
 #   tiers:  how each tier maps to a concrete model PER target.
 #
 # Claude uses aliases (auto-track the latest model). VS Code uses
-# "Name (vendor)" strings; an array is a fallback order. Copilot CLI defaults
-# to `inherit` (the generator writes no model: key, so it uses the session model).
+# "Name (vendor)" strings; an array is a fallback order. The github-copilot
+# target injects no model (agents inherit the session model), so it has no column.
 
 agents:
   sdd-design: premium
@@ -29,12 +29,9 @@ tiers:
   premium:
     claude: opus
     vscode: ["Claude Opus 4.8 (copilot)", "GPT-5.5 (copilot)"]
-    copilot-cli: inherit
   default:
     claude: sonnet
     vscode: ["Claude Sonnet 4.6 (copilot)", "GPT-5.3-Codex (copilot)"]
-    copilot-cli: inherit
   cheap:
     claude: haiku
     vscode: ["Qwen 3.6 MSC1 (customendpoint)", "GPT-5.4-mini (copilot)"]
-    copilot-cli: inherit

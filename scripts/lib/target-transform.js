@@ -29,6 +29,10 @@ function transform({ files, profile, models }) {
 function handleFile(file, profile, models, rulesContent) {
   const { path } = file;
 
+  if (isDropped(path, profile)) {
+    return null; // artifact the target does not consume (e.g. plugin manifest/hooks)
+  }
+
   if (profile.manifest && path === profile.manifest.location) {
     return reshapeManifest(file, profile);
   }
@@ -40,6 +44,9 @@ function handleFile(file, profile, models, rulesContent) {
   if (isRulesFile(path)) {
     if (profile.rules && isInlineStrategy(profile.rules.strategy)) {
       return null; // content folded into the orchestrator agent/skill
+    }
+    if (profile.rules && profile.rules.strategy === "to-instructions") {
+      return toInstructionFile(file, profile);
     }
     return { path, content: file.content };
   }
@@ -69,8 +76,19 @@ function isInlineStrategy(strategy) {
   return strategy === "inline-into-orchestrator";
 }
 
+function isDropped(path, profile) {
+  return Array.isArray(profile.drop) && profile.drop.some((prefix) => path === prefix || path.startsWith(prefix));
+}
+
 function isRulesFile(path) {
   return path.startsWith("rules/");
+}
+
+// Remap a category path onto a target directory, e.g.
+// remapDir("agents/sdd-apply.agent.md", "agents/", ".github/agents") ->
+// ".github/agents/sdd-apply.agent.md".
+function remapDir(path, sourcePrefix, targetDir) {
+  return `${targetDir}/${path.slice(sourcePrefix.length)}`;
 }
 
 function isAgent(path, profile) {
@@ -171,7 +189,10 @@ function emitOrchestratorSkill(file, profile, rulesContent) {
 // --- agents ----------------------------------------------------------------
 
 function handleAgent(file, profile, models) {
-  const newPath = renameExtension(file.path, profile.agentFile);
+  let newPath = renameExtension(file.path, profile.agentFile);
+  if (profile.agentDir) {
+    newPath = remapDir(newPath, "agents/", profile.agentDir);
+  }
   let { frontmatter, body } = parse(file.content);
   const nameField = getField(frontmatter, "name");
   const agentName = nameField ? nameField.value : undefined;
@@ -180,8 +201,14 @@ function handleAgent(file, profile, models) {
     frontmatter = stripKeys(frontmatter, profile.frontmatter.stripKeys);
   }
 
+  if (profile.setAgentFrontmatter) {
+    for (const [key, value] of Object.entries(profile.setAgentFrontmatter)) {
+      frontmatter = setScalar(frontmatter, key, value);
+    }
+  }
+
   if (profile.toolMap) {
-    frontmatter = mapToolsFrontmatter(frontmatter, profile.toolMap);
+    frontmatter = mapToolsFrontmatter(frontmatter, profile.toolMap, profile.dropTools);
     body = substituteProse(body, profile.toolMap);
   }
 
@@ -200,7 +227,10 @@ function handleAgent(file, profile, models) {
 // --- commands --------------------------------------------------------------
 
 function handleCommand(file, profile) {
-  const newPath = renameExtension(file.path, profile.commandFile);
+  let newPath = renameExtension(file.path, profile.commandFile);
+  if (profile.commandDir) {
+    newPath = remapDir(newPath, "commands/", profile.commandDir);
+  }
   let { frontmatter, body } = parse(file.content);
 
   if (profile.frontmatter) {
@@ -214,7 +244,7 @@ function handleCommand(file, profile) {
   }
 
   if (profile.toolMap) {
-    frontmatter = mapToolsFrontmatter(frontmatter, profile.toolMap);
+    frontmatter = mapToolsFrontmatter(frontmatter, profile.toolMap, profile.dropTools);
     body = substituteProse(body, profile.toolMap);
   }
 
@@ -247,14 +277,18 @@ function handleCommand(file, profile) {
 
 // --- tool-name substitution ------------------------------------------------
 
-function mapToolsFrontmatter(frontmatter, toolMap) {
+function mapToolsFrontmatter(frontmatter, toolMap, dropTools) {
   const field = getField(frontmatter, "tools");
   if (!field || !Array.isArray(field.value)) {
     return frontmatter;
   }
 
+  const drop = new Set(dropTools || []);
   const mapped = [];
   for (const tool of field.value) {
+    if (drop.has(tool)) {
+      continue; // tool has no equivalent on this target; remove from the grant
+    }
     const replacement = toolMap[tool];
     if (replacement === undefined) {
       mapped.push(tool);
@@ -266,6 +300,18 @@ function mapToolsFrontmatter(frontmatter, toolMap) {
   }
 
   return setArray(frontmatter, "tools", mapped);
+}
+
+// rules/<name>.instructions.md -> <profile.rules.dir>/<name>.instructions.md, made
+// always-on with an applyTo glob (the .github/instructions/ format).
+function toInstructionFile(file, profile) {
+  let { frontmatter, body } = parse(file.content);
+  if (profile.toolMap) {
+    body = substituteProse(body, profile.toolMap);
+  }
+  frontmatter = setScalar(frontmatter, "applyTo", `"${profile.rules.applyTo}"`);
+  const base = file.path.slice("rules/".length);
+  return { path: `${profile.rules.dir}/${base}`, content: serialize({ frontmatter, body }) };
 }
 
 function escapeRegExp(value) {

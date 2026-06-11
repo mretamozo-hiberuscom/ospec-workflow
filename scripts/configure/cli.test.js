@@ -129,7 +129,7 @@ test("a clean validator run keeps a zero exit", (t) => {
 // Golden snapshots
 // ---------------------------------------------------------------------------
 
-for (const target of ["claude"]) {
+for (const target of ["claude", "github-copilot"]) {
   test(`generated ${target} tree matches the committed golden`, (t) => {
     const out = tmpOut(t);
     runConfigure({ sourceDir: SOURCE, target, outDir: out, validate: false });

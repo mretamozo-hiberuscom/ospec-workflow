@@ -38,9 +38,8 @@ no escribe la clave `model:` y el host usa el modelo de la sesión.
 | `default` | `sonnet` | `Claude Sonnet 4.6 (copilot)`, `GPT-5.3-Codex (copilot)` |
 | `cheap` | `haiku` | `Qwen 3.6 MSC1 (customendpoint)`, `GPT-5.4-mini (copilot)` |
 
-`models.yaml` también lleva una columna `copilot-cli: inherit` por tier, reservada para el target
-`copilot-cli` planificado (ver el cambio de compatibilidad multi-target). Como `inherit` resuelve a
-OMIT, es inerte hasta que ese target exista.
+El target `github-copilot` no inyecta `model:` (el origen lo omite y no hay columna `github-copilot`
+en `tiers`): los agentes generados heredan el modelo de la sesión de Copilot.
 
 ## Formato del modelo por target
 
@@ -52,8 +51,8 @@ serializa en el frontmatter:
   siguen automáticamente el modelo más reciente, así que no hay IDs que mantener.
 - **`vscode`**: una lista `"Nombre (vendor)"` que actúa como **orden de preferencia**;
   VS Code usa el primero disponible. Admite vendors como `copilot` y `customendpoint`.
-- **`copilot-cli`** (planificado): mapeará a `inherit` → OMIT (sin clave `model:`, hereda el modelo
-  de la sesión), evitando la sintaxis de modelo aún poco especificada de GitHub.
+- **`github-copilot`**: no se escribe `model:` (OMIT); el agente hereda el modelo de la sesión de
+  Copilot, evitando la sintaxis de modelo aún poco especificada de GitHub.
 
 ## Perfiles locales heredados
 

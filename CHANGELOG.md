@@ -9,16 +9,16 @@ Plugin version tracks `.plugin/plugin.json`.
 ## [Unreleased]
 
 ### Added
-- Multi-target plugin compatibility: a dependency-free generator that transforms
-  the canonical VS Code source into a native, validate-clean Claude Code plugin
-  tree (`scripts/configure/cli.js --target claude`). Includes a pure
-  `target-transform` with per-target profiles, context-aware tool-name
-  substitution, a tier-based `models.yaml` resolver, frontmatter helpers, the
-  orchestrator delivered as a skill, committed golden fixtures, and a
-  `claude plugin validate --strict` gate. The source is never mutated; VS Code
-  keeps loading it directly. A `copilot-cli` target is planned (GitHub Copilot
-  CLI uses `.github/agents/` + `.github/copilot-instructions.md`, not a
-  `.claude-plugin/` tree) and tracked as a future change.
+- Multi-target plugin compatibility: a dependency-free generator
+  (`scripts/configure/cli.js`) that transforms the canonical VS Code source into
+  native trees for three targets — `claude` (a `.claude-plugin` bundle, gated by
+  `claude plugin validate --strict`), `github-copilot` (the `.github/` layout:
+  `agents/`, `prompts/`, `instructions/`), and `vscode` (identity). Includes a
+  pure `target-transform` with declarative per-target profiles, context-aware
+  tool-name substitution, path remapping and artifact drops, a tier-based
+  `models.yaml` resolver, frontmatter helpers, the Claude orchestrator delivered
+  as a skill, and committed golden fixtures. The source is never mutated; VS Code
+  keeps loading it directly.
 - YAML frontmatter (`name`, `description`) on the `agent-introspection` and
   `harness-audit` skills so the plugin validator stops warning.
 - Brownfield bootstrap path: `sdd-baseline` agent, command, and skill to seed
