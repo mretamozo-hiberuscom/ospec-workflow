@@ -25,22 +25,54 @@ function runStep(name, args) {
   }
 }
 
-function main() {
-  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "ospec-github-copilot-"));
+// The claude profile validates with the external `claude` CLI, which is not
+// guaranteed in CI. Probe for it so check.js can validate claude when present
+// and fall back to generation-only (still exercising the transform) otherwise.
+function claudeCliAvailable() {
+  for (const bin of ["claude", "claude.cmd", "claude.exe"]) {
+    const probe = spawnSync(bin, ["--version"], { stdio: "ignore", shell: false });
+    if (!probe.error) {
+      return true;
+    }
+  }
+  return false;
+}
 
+function generateTarget(target, validate) {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), `ospec-${target}-`));
   try {
-    runStep("Native Node tests", ["--test", "scripts/**/*.test.js"]);
-    runStep("Generate and profile-validate GitHub Copilot output", [
-      "scripts/configure/cli.js",
-      "--target",
-      "github-copilot",
-      "--out",
-      outDir,
-    ]);
-    process.stdout.write("\nAll checks passed.\n");
+    const args = ["scripts/configure/cli.js", "--target", target, "--source", ROOT, "--out", outDir];
+    if (!validate) {
+      args.push("--no-validate");
+    }
+    const label = validate ? `Generate + validate ${target}` : `Generate ${target} (validation skipped)`;
+    runStep(label, args);
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
   }
+}
+
+function main() {
+  runStep("Native Node tests", ["--test", "scripts/**/*.test.js"]);
+
+  const claudeOk = claudeCliAvailable();
+  if (!claudeOk) {
+    process.stdout.write("\n(note) claude CLI not found — generating the claude target without its validator.\n");
+  }
+
+  // github-copilot always validates (local node validator); vscode is an identity
+  // transform with no validator; claude validates only when its CLI is installed.
+  const targets = [
+    { target: "claude", validate: claudeOk },
+    { target: "vscode", validate: false },
+    { target: "github-copilot", validate: true },
+  ];
+
+  for (const { target, validate } of targets) {
+    generateTarget(target, validate);
+  }
+
+  process.stdout.write("\nAll checks passed.\n");
 }
 
 if (require.main === module) {
