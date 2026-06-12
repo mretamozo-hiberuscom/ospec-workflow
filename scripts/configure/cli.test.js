@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { loadTree, gatherRuntimeScripts, parseModels, runConfigure } = require("./cli.js");
+const { loadTree, gatherRuntimeScripts, parseModels, runConfigure, defaultRunValidator } = require("./cli.js");
 
 const FIXTURES = path.join(__dirname, "__fixtures__");
 const SOURCE = path.join(FIXTURES, "source");
@@ -145,7 +145,25 @@ test("github-copilot validation uses the profile-level validator command", (t) =
 
   assert.equal(result.exitCode, 0);
   assert.equal(validatorOut, out);
-  assert.match(validatorProfile.validate, /validate-github-copilot\.js/);
+  assert.ok(
+    validatorProfile.validate.some((part) => part.includes("validate-github-copilot.js")),
+    "profile.validate argv must reference the github-copilot validator",
+  );
+});
+
+test("defaultRunValidator runs the validator without a shell, passing {out} as one literal argv element", () => {
+  // Without a shell, metacharacters in the output path cannot be reinterpreted:
+  // the path arrives as a single argv element, proving the injection vector is gone.
+  const profile = {
+    validate: [process.execPath, "-e", "process.stdout.write(JSON.stringify(process.argv))", "{out}"],
+  };
+  const hostileOut = "a b & echo pwned > owned.txt";
+
+  const result = defaultRunValidator(profile, hostileOut);
+  const argv = JSON.parse(result.stdout);
+
+  assert.equal(result.status, 0);
+  assert.equal(argv[argv.length - 1], hostileOut);
 });
 
 // ---------------------------------------------------------------------------

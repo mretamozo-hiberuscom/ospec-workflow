@@ -64,5 +64,8 @@ module.exports = {
   drop: [".claude-plugin/"],
 
   // No model injection: the source omits model and github-copilot has no models.yaml column.
-  validate: 'node scripts/configure/validate-github-copilot.js "{out}"',
+  // argv form (not a shell string): the runner spawns it with shell:false so the
+  // {out} path can never be reinterpreted by a shell. "node" resolves to the
+  // running interpreter (process.execPath) in the runner.
+  validate: ["node", "scripts/configure/validate-github-copilot.js", "{out}"],
 };

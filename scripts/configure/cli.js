@@ -173,9 +173,16 @@ function unquote(value) {
 
 // --- validation gate -------------------------------------------------------
 
+// Run a target's validator as a child process. profile.validate is an argv array
+// ([command, ...args]); the {out} placeholder is substituted per element and the
+// process is spawned WITHOUT a shell, so a hostile or mistyped output path is
+// always a single literal argument and can never be reinterpreted by a shell.
 function defaultRunValidator(profile, outDir) {
-  const command = profile.validate.replace("{out}", outDir);
-  const result = spawnSync(command, { shell: true, encoding: "utf8" });
+  const [command, ...rest] = profile.validate;
+  const args = rest.map((part) => part.split("{out}").join(outDir));
+  // "node" -> the running interpreter, avoiding PATH/PATHEXT resolution surprises.
+  const bin = command === "node" ? process.execPath : command;
+  const result = spawnSync(bin, args, { shell: false, encoding: "utf8" });
   return { status: result.status, stdout: result.stdout || "", stderr: result.stderr || "" };
 }
 
@@ -273,6 +280,7 @@ module.exports = {
   gatherRuntimeScripts,
   writeTree,
   parseModels,
+  defaultRunValidator,
   runConfigure,
   main,
   PROFILES,
