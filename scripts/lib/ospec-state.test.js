@@ -173,6 +173,23 @@ test("appendRuntimeEvent serializes concurrent writers without corrupting lines"
   assert.deepEqual(seqs, Array.from({ length: count }, (_unused, i) => i));
 });
 
+test("appendRuntimeEvent reclaims a stale orphaned lock instead of stalling forever", async (t) => {
+  const workspace = await createWorkspace(t);
+  const eventPath = path.join(workspace, ...RUNTIME_EVENT_RELATIVE_PATH.split("/"));
+  await fs.mkdir(path.dirname(eventPath), { recursive: true });
+
+  // Simulate a writer that crashed holding the lock: an old, never-released file.
+  const lockPath = `${eventPath}.lock`;
+  await fs.writeFile(lockPath, "");
+  const past = new Date(Date.now() - 60000);
+  await fs.utimes(lockPath, past, past);
+
+  const result = await appendRuntimeEvent({ workspace, seq: 1 });
+
+  assert.match((await fs.readFile(result.absolutePath, "utf8")).trim(), /"seq":1/);
+  await assert.rejects(fs.stat(lockPath), (error) => error.code === "ENOENT");
+});
+
 test("readBaselineState returns null when baseline block is absent", () => {
   assert.equal(readBaselineState("strict_tdd: true\ntesting:\n  command: node --test\n"), null);
 });

@@ -337,7 +337,23 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // sub-agents firing subagent-stop at once could interleave or drop JSONL lines.
 // Exclusive-create ("wx") of a sibling .lock file IS atomic on every platform, so
 // holding it around the append makes each line a clean, complete write.
-async function withAppendLock(eventPath, run, { retries = 100, delayMs = 15 } = {}) {
+async function reclaimStaleLock(lockPath, staleMs) {
+  // A crashed writer can orphan the lock. Reclaim it once it is older than the
+  // staleness window so contention recovers automatically instead of every
+  // subsequent append bypassing the lock forever.
+  try {
+    const { mtimeMs } = await fs.stat(lockPath);
+    if (Date.now() - mtimeMs > staleMs) {
+      await fs.rm(lockPath, { force: true });
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      throw error;
+    }
+  }
+}
+
+async function withAppendLock(eventPath, run, { retries = 100, delayMs = 15, staleMs = 10000 } = {}) {
   const lockPath = `${eventPath}.lock`;
   for (let attempt = 0; ; attempt += 1) {
     let handle;
@@ -347,9 +363,10 @@ async function withAppendLock(eventPath, run, { retries = 100, delayMs = 15 } = 
       if (error.code !== "EEXIST") {
         throw error;
       }
+      await reclaimStaleLock(lockPath, staleMs);
       if (attempt >= retries) {
-        // A crashed writer can orphan the lock. Rather than lose the event after
-        // ~1.5s of contention, proceed best-effort (still better than no lock).
+        // Still contended after reclamation attempts: proceed best-effort rather
+        // than lose the event (still better than no lock at all).
         return run();
       }
       await sleep(delayMs);
