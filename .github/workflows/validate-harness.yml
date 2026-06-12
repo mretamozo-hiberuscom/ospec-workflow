@@ -4,10 +4,20 @@ on:
   push:
   pull_request:
 
+# Least privilege: the harness only reads the checkout, never writes to the repo.
+permissions:
+  contents: read
+
+# Supersede in-flight runs for the same ref so pushes don't pile up duplicate work.
+concurrency:
+  group: validate-harness-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     name: Validate (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
