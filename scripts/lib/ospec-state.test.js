@@ -152,6 +152,27 @@ test("appends runtime events without serializing workspace metadata", async (t) 
   assert.equal(lines[1].agent, "sdd-spec");
 });
 
+test("appendRuntimeEvent serializes concurrent writers without corrupting lines", async (t) => {
+  const workspace = await createWorkspace(t);
+  const count = 40;
+
+  // Parallel sub-agents each fire subagent-stop -> appendRuntimeEvent at once.
+  // Every line must remain whole JSON and every event must survive.
+  const results = await Promise.all(
+    Array.from({ length: count }, (_unused, i) =>
+      appendRuntimeEvent({ workspace, seq: i, payload: "x".repeat(300) }),
+    ),
+  );
+
+  const lines = (await fs.readFile(results[0].absolutePath, "utf8"))
+    .trim()
+    .split(/\r?\n/);
+
+  assert.equal(lines.length, count, "no line may be lost or merged");
+  const seqs = lines.map((line) => JSON.parse(line).seq).sort((a, b) => a - b);
+  assert.deepEqual(seqs, Array.from({ length: count }, (_unused, i) => i));
+});
+
 test("readBaselineState returns null when baseline block is absent", () => {
   assert.equal(readBaselineState("strict_tdd: true\ntesting:\n  command: node --test\n"), null);
 });

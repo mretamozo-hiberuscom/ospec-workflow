@@ -330,6 +330,40 @@ async function writeSessionSummary(changePath, summary) {
   };
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Serialize appends across processes with an advisory lock. fs.appendFile is not
+// a guaranteed-atomic cross-process operation (notably on Windows), so parallel
+// sub-agents firing subagent-stop at once could interleave or drop JSONL lines.
+// Exclusive-create ("wx") of a sibling .lock file IS atomic on every platform, so
+// holding it around the append makes each line a clean, complete write.
+async function withAppendLock(eventPath, run, { retries = 100, delayMs = 15 } = {}) {
+  const lockPath = `${eventPath}.lock`;
+  for (let attempt = 0; ; attempt += 1) {
+    let handle;
+    try {
+      handle = await fs.open(lockPath, "wx");
+    } catch (error) {
+      if (error.code !== "EEXIST") {
+        throw error;
+      }
+      if (attempt >= retries) {
+        // A crashed writer can orphan the lock. Rather than lose the event after
+        // ~1.5s of contention, proceed best-effort (still better than no lock).
+        return run();
+      }
+      await sleep(delayMs);
+      continue;
+    }
+    try {
+      return await run();
+    } finally {
+      await handle.close();
+      await fs.rm(lockPath, { force: true });
+    }
+  }
+}
+
 async function appendRuntimeEvent(event) {
   if (!event || typeof event !== "object" || Array.isArray(event)) {
     throw new TypeError("Runtime event must be an object.");
@@ -346,10 +380,8 @@ async function appendRuntimeEvent(event) {
   delete serializedEvent.cwd;
 
   await fs.mkdir(path.dirname(eventPath), { recursive: true });
-  await fs.appendFile(
-    eventPath,
-    `${JSON.stringify(serializedEvent)}\n`,
-    "utf8",
+  await withAppendLock(eventPath, () =>
+    fs.appendFile(eventPath, `${JSON.stringify(serializedEvent)}\n`, "utf8"),
   );
 
   return {
