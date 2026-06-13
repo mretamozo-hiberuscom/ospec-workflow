@@ -179,6 +179,37 @@ test("real repo: orchestrator conditional clarify references residual_ambiguity"
   );
 });
 
+test("real repo: sdd-foundation agent mentions markitdown degradation", (t) => {
+  const targetPaths = {
+    claude: "agents/sdd-foundation.md",
+    vscode: "agents/sdd-foundation.agent.md",
+    "github-copilot": ".github/agents/sdd-foundation.agent.md",
+    opencode: ".opencode/agents/sdd-foundation.md",
+  };
+
+  for (const [target, expectedPath] of Object.entries(targetPaths)) {
+    const out = tmpOut(t);
+    runConfigure({ sourceDir: ROOT, target, outDir: out, validate: false });
+
+    assert.ok(
+      fs.existsSync(path.join(out, expectedPath)),
+      `sdd-foundation agent missing from ${target} output at ${expectedPath}`
+    );
+
+    const text = fs.readFileSync(path.join(out, expectedPath), "utf8");
+    assert.match(
+      text,
+      /mcp__microsoft_markitdown__convert_to_markdown/,
+      `sdd-foundation agent (${target}) must reference mcp__microsoft_markitdown__convert_to_markdown`
+    );
+    assert.match(
+      text,
+      /fallback|degradation/i,
+      `sdd-foundation agent (${target}) must contain a fallback/degradation reference`
+    );
+  }
+});
+
 test("real repo: orchestrator brownfield route replaces standalone Baseline Advisory", (t) => {
   const out = tmpOut(t);
   runConfigure({ sourceDir: ROOT, target: "vscode", outDir: out, validate: false });
