@@ -38,6 +38,14 @@ const KNOWN_CLASSES = ["trivial", "small", "normal", "high-risk"];
 
 const KNOWN_COSTS = ["low", "medium", "high"];
 
+// Derived/synthetic boolean signals — computed by the orchestrator (file I/O)
+// and passed in via ctx; the dispatcher is pure (reads only its arguments).
+const KNOWN_DERIVED_SIGNALS = ["specs_empty_with_code", "code_without_specs"];
+
+// Top-level route fields that must coerce from YAML literal strings to boolean.
+// Scoped to known fields to avoid surprising other string-valued fields (W2 fix).
+const KNOWN_BOOLEAN_FIELDS = new Set(["experimental"]);
+
 // ---------------------------------------------------------------------------
 // Internal helpers (pure, no I/O)
 // ---------------------------------------------------------------------------
@@ -92,6 +100,77 @@ function parseScalarOrInlineArray(val) {
   }
 
   return parseScalar(val);
+}
+
+/**
+ * Coerce a string scalar from YAML to a native boolean when it is the literal
+ * text 'true' or 'false'.  All other values pass through unchanged.
+ */
+function coerceBoolean(val) {
+  if (val === "true") return true;
+  if (val === "false") return false;
+  return val;
+}
+
+// ---------------------------------------------------------------------------
+// matchConditions(conditions, ctx) → boolean
+// ---------------------------------------------------------------------------
+
+/**
+ * Evaluate the extended conditions model against a caller-supplied context.
+ *
+ * Semantics:
+ *   - `match: 'any'` → OR-s sibling condition keys (at least one must match).
+ *   - `match: 'all'` (default) → AND-s all sibling condition keys (every one must match).
+ *   - Array value for a key → ANY-of: matches when ctx[key] equals any element.
+ *   - Scalar/boolean value → strict equality: ctx[key] === expected.
+ *   - Empty keys set: 'all' is vacuously true; 'any' is false.
+ *   - Absent ctx key: undefined, which fails a strict-equality check (no-match).
+ *
+ * Pure: reads only its arguments; no I/O, no global mutation.
+ * Derived signals (e.g. specs_empty_with_code) are pre-computed by the caller.
+ *
+ * @param {object} conditions - Conditions map (may include 'match' meta-key)
+ * @param {object} ctx        - Change context (caller-supplied; may include derived signals)
+ * @returns {boolean}
+ */
+function matchConditions(conditions, ctx) {
+  if (conditions === null || typeof conditions !== "object" || Array.isArray(conditions)) {
+    return false;
+  }
+
+  const keys = Object.keys(conditions).filter((k) => k !== "match");
+  const mode = conditions.match === "any" ? "any" : "all";
+
+  // Edge case: no condition keys
+  if (keys.length === 0) {
+    // Vacuously true for 'all', false for 'any'
+    return mode === "all";
+  }
+
+  for (const key of keys) {
+    const expected = conditions[key];
+    const actual = ctx[key];
+
+    let keyMatches;
+    if (Array.isArray(expected)) {
+      keyMatches = expected.includes(actual);
+    } else {
+      // Strict equality — boolean false in ctx correctly fails boolean true in conditions
+      keyMatches = expected === actual;
+    }
+
+    if (mode === "all" && !keyMatches) {
+      return false;
+    }
+    if (mode === "any" && keyMatches) {
+      return true;
+    }
+  }
+
+  // mode === "all" → every key matched → true
+  // mode === "any" → no key matched → false
+  return mode === "all";
 }
 
 // ---------------------------------------------------------------------------
@@ -156,6 +235,28 @@ function validateRoute(entry) {
     Array.isArray(entry.conditions)
   ) {
     errors.push("field 'conditions' must be an object");
+  } else {
+    // Extended conditions validation:
+    // (1) 'match' meta-key, if present, must be 'all' or 'any'
+    if ("match" in entry.conditions) {
+      const matchVal = entry.conditions.match;
+      if (matchVal !== "all" && matchVal !== "any") {
+        errors.push(
+          `conditions 'match' must be 'all' or 'any'; received '${matchVal}'`,
+        );
+      }
+    }
+    // (2) KNOWN_DERIVED_SIGNALS keys, if present, must have boolean values
+    for (const signal of KNOWN_DERIVED_SIGNALS) {
+      if (signal in entry.conditions) {
+        const signalVal = entry.conditions[signal];
+        if (typeof signalVal !== "boolean") {
+          errors.push(
+            `conditions key '${signal}' must be a boolean; received ${typeof signalVal}`,
+          );
+        }
+      }
+    }
   }
 
   // --- phases: non-empty array of KNOWN_PHASES ---
@@ -350,7 +451,11 @@ function parseRoutingTable(content) {
       if (kvMatch) {
         const key = kvMatch[1];
         const rawVal = kvMatch[2].trim();
-        currentEntry[key] = parseScalarOrInlineArray(rawVal === "" ? null : rawVal);
+        const parsedVal = parseScalarOrInlineArray(rawVal === "" ? null : rawVal);
+        currentEntry[key] =
+          KNOWN_BOOLEAN_FIELDS.has(key) && typeof parsedVal === "string"
+            ? coerceBoolean(parsedVal)
+            : parsedVal;
       }
 
       continue;
@@ -384,7 +489,11 @@ function parseRoutingTable(content) {
         currentArrayKey = key;
         currentEntry[key] = [];
       } else {
-        currentEntry[key] = parseScalarOrInlineArray(rawVal);
+        const parsedVal = parseScalarOrInlineArray(rawVal);
+        currentEntry[key] =
+          KNOWN_BOOLEAN_FIELDS.has(key) && typeof parsedVal === "string"
+            ? coerceBoolean(parsedVal)
+            : parsedVal;
       }
 
       continue;
@@ -398,9 +507,15 @@ function parseRoutingTable(content) {
 
         if (kvMatch) {
           const condKey = kvMatch[1];
-          const condVal = parseScalar(kvMatch[2].trim());
-
-          currentEntry.conditions[condKey] = condVal;
+          const rawCondVal = kvMatch[2].trim();
+          // Use parseScalarOrInlineArray so inline arrays round-trip to JS arrays.
+          // Then apply boolean coercion to scalar strings — EXCEPT for the 'match'
+          // meta-key, which must remain a string ('any'/'all').
+          const parsedCondVal = parseScalarOrInlineArray(rawCondVal);
+          currentEntry.conditions[condKey] =
+            condKey !== "match" && typeof parsedCondVal === "string"
+              ? coerceBoolean(parsedCondVal)
+              : parsedCondVal;
         }
       } else if (currentArrayKey !== null) {
         // "      - item" inside a block sequence
@@ -430,6 +545,10 @@ const DETERMINISTIC_SIGNAL_KEYS = new Set([
   "project.status",
   "baseline.status",
   "artifact_store.backend",
+  // Derived signals — computed deterministically by the orchestrator (file I/O);
+  // presence in ctx means the orchestrator already resolved them without user input.
+  "specs_empty_with_code",
+  "code_without_specs",
 ]);
 
 /**
@@ -482,8 +601,10 @@ module.exports = {
   KNOWN_REVIEWERS,
   KNOWN_CLASSES,
   KNOWN_COSTS,
+  KNOWN_DERIVED_SIGNALS,
   validateRoute,
   validateRouteTable,
   parseRoutingTable,
   classifyChange,
+  matchConditions,
 };

@@ -12,6 +12,7 @@ const {
   validateRouteTable,
   parseRoutingTable,
   classifyChange,
+  matchConditions,
 } = require("./route-dispatcher.js");
 
 // ---------------------------------------------------------------------------
@@ -622,4 +623,313 @@ test("classifyChange executes with arbitrary plain object (no I/O required)", ()
   const result = classifyChange({ anything: "goes" });
 
   assert.ok(typeof result.confidence === "string");
+});
+
+// ---------------------------------------------------------------------------
+// Phase 6 RED tests — matchConditions (6.1)
+// ---------------------------------------------------------------------------
+
+// (a) match: all default AND semantics
+test("matchConditions AND mode — both keys match returns true", () => {
+  const conditions = {
+    "project.status": "active",
+    "baseline.status": "pending",
+  };
+  assert.equal(matchConditions(conditions, { "project.status": "active", "baseline.status": "pending" }), true);
+});
+
+test("matchConditions AND mode — one key fails returns false", () => {
+  const conditions = {
+    "project.status": "active",
+    "baseline.status": "pending",
+  };
+  assert.equal(matchConditions(conditions, { "project.status": "active", "baseline.status": "done" }), false);
+});
+
+// (b) match: any OR semantics
+test("matchConditions OR mode — only one key matches returns true", () => {
+  const conditions = {
+    match: "any",
+    "project.status": "empty",
+    "baseline.status": "pending",
+  };
+  assert.equal(matchConditions(conditions, { "project.status": "empty" }), true);
+});
+
+test("matchConditions OR mode — no key matches returns false", () => {
+  const conditions = {
+    match: "any",
+    "project.status": "empty",
+    "baseline.status": "pending",
+  };
+  assert.equal(matchConditions(conditions, { "project.status": "active", "baseline.status": "done" }), false);
+});
+
+// (c) array-valued key ANY-of
+test("matchConditions array value — ctx value equals first element returns true", () => {
+  const conditions = { "baseline.status": ["pending", "partial"] };
+  assert.equal(matchConditions(conditions, { "baseline.status": "pending" }), true);
+});
+
+test("matchConditions array value — ctx value equals second element returns true", () => {
+  const conditions = { "baseline.status": ["pending", "partial"] };
+  assert.equal(matchConditions(conditions, { "baseline.status": "partial" }), true);
+});
+
+test("matchConditions array value — ctx value not in array returns false", () => {
+  const conditions = { "baseline.status": ["pending", "partial"] };
+  assert.equal(matchConditions(conditions, { "baseline.status": "done" }), false);
+});
+
+// (d) derived boolean signal match
+test("matchConditions derived boolean — true in conditions matches true in ctx", () => {
+  const conditions = { specs_empty_with_code: true };
+  assert.equal(matchConditions(conditions, { specs_empty_with_code: true }), true);
+});
+
+test("matchConditions derived boolean — true in conditions fails false in ctx", () => {
+  const conditions = { specs_empty_with_code: true };
+  assert.equal(matchConditions(conditions, { specs_empty_with_code: false }), false);
+});
+
+// (e) full brownfield trigger pattern
+const BROWNFIELD_CONDITIONS = {
+  match: "any",
+  "baseline.status": ["pending", "partial"],
+  specs_empty_with_code: true,
+  code_without_specs: true,
+};
+
+test("matchConditions brownfield any — pending baseline matches", () => {
+  assert.equal(matchConditions(BROWNFIELD_CONDITIONS, { "baseline.status": "pending" }), true);
+});
+
+test("matchConditions brownfield any — specs_empty_with_code true matches", () => {
+  assert.equal(matchConditions(BROWNFIELD_CONDITIONS, { specs_empty_with_code: true }), true);
+});
+
+test("matchConditions brownfield any — code_without_specs true matches", () => {
+  assert.equal(matchConditions(BROWNFIELD_CONDITIONS, { code_without_specs: true }), true);
+});
+
+// (f) done-baseline suppression
+test("matchConditions brownfield any — done baseline with all signals false returns false", () => {
+  assert.equal(
+    matchConditions(BROWNFIELD_CONDITIONS, {
+      "baseline.status": "done",
+      specs_empty_with_code: false,
+      code_without_specs: false,
+    }),
+    false,
+  );
+});
+
+// (g) empty-conditions edge
+test("matchConditions empty conditions match:all returns true (vacuously true)", () => {
+  assert.equal(matchConditions({}, {}), true);
+});
+
+test("matchConditions empty conditions match:any returns false", () => {
+  assert.equal(matchConditions({ match: "any" }, {}), false);
+});
+
+// (h) absent derived signal in ctx
+test("matchConditions absent derived signal in ctx fails boolean check", () => {
+  const conditions = { specs_empty_with_code: true };
+  // ctx has no specs_empty_with_code key; undefined !== true → false
+  assert.equal(matchConditions(conditions, {}), false);
+});
+
+// ---------------------------------------------------------------------------
+// Phase 6 RED tests — validateRoute extended conditions (6.2)
+// ---------------------------------------------------------------------------
+
+// (a) accepts conditions with match: 'any' meta-key alongside real keys
+test("validateRoute accepts conditions with match:any meta-key alongside real keys", () => {
+  const entry = {
+    ...STANDARD_ROUTE,
+    conditions: {
+      match: "any",
+      "project.status": "empty",
+      "baseline.status": "pending",
+    },
+  };
+  const result = validateRoute(entry);
+  assert.equal(result.valid, true, `expected valid; errors: ${JSON.stringify(result.errors)}`);
+});
+
+// (b) accepts array-valued condition key
+test("validateRoute accepts array-valued condition key in conditions", () => {
+  const entry = {
+    ...STANDARD_ROUTE,
+    conditions: {
+      match: "any",
+      "baseline.status": ["pending", "partial"],
+    },
+  };
+  const result = validateRoute(entry);
+  assert.equal(result.valid, true, `expected valid; errors: ${JSON.stringify(result.errors)}`);
+});
+
+// (c) accepts KNOWN_DERIVED_SIGNALS key with boolean value
+test("validateRoute accepts KNOWN_DERIVED_SIGNALS key with boolean true value", () => {
+  const entry = {
+    ...STANDARD_ROUTE,
+    conditions: {
+      specs_empty_with_code: true,
+    },
+  };
+  const result = validateRoute(entry);
+  assert.equal(result.valid, true, `expected valid; errors: ${JSON.stringify(result.errors)}`);
+});
+
+// (d) rejects match value not in {all, any}
+test("validateRoute rejects match value not in {all, any}", () => {
+  const entry = {
+    ...STANDARD_ROUTE,
+    conditions: {
+      match: "or",
+      "project.status": "active",
+    },
+  };
+  const result = validateRoute(entry);
+  assert.equal(result.valid, false);
+  assert.ok(
+    result.errors.some((e) => /match/i.test(e)),
+    `expected error about 'match'; got: ${JSON.stringify(result.errors)}`,
+  );
+});
+
+// (e) rejects KNOWN_DERIVED_SIGNALS key with non-boolean value
+test("validateRoute rejects KNOWN_DERIVED_SIGNALS key with non-boolean value", () => {
+  const entry = {
+    ...STANDARD_ROUTE,
+    conditions: {
+      specs_empty_with_code: "yes",
+    },
+  };
+  const result = validateRoute(entry);
+  assert.equal(result.valid, false);
+  assert.ok(
+    result.errors.some((e) => /specs_empty_with_code/i.test(e)),
+    `expected error naming 'specs_empty_with_code'; got: ${JSON.stringify(result.errors)}`,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Phase 6 RED tests — parseRoutingTable coercion (6.3)
+// ---------------------------------------------------------------------------
+
+// (a) conditions inline-array value round-trips to JS array
+test("parseRoutingTable coerces conditions inline-array to JS array", () => {
+  const content = [
+    "routing:",
+    "  - name: brownfield",
+    "    classification: [normal, high-risk]",
+    "    conditions:",
+    "      baseline.status: [pending, partial]",
+    "    phases: [sdd-baseline]",
+    "    gates: [brownfield-advisory]",
+    "    description: Brownfield.",
+  ].join("\n");
+
+  const routes = parseRoutingTable(content);
+  assert.deepEqual(
+    routes[0].conditions["baseline.status"],
+    ["pending", "partial"],
+    "baseline.status must be a JS array",
+  );
+});
+
+// (b) condition value 'true' coerces to native boolean true
+test("parseRoutingTable coerces condition 'true' string to boolean true", () => {
+  const content = [
+    "routing:",
+    "  - name: brownfield",
+    "    classification: normal",
+    "    conditions:",
+    "      specs_empty_with_code: true",
+    "    phases: [sdd-baseline]",
+    "    gates: []",
+    "    description: Brownfield.",
+  ].join("\n");
+
+  const routes = parseRoutingTable(content);
+  assert.equal(routes[0].conditions.specs_empty_with_code, true);
+  assert.equal(typeof routes[0].conditions.specs_empty_with_code, "boolean");
+});
+
+// (c) condition value 'false' coerces to native boolean false
+test("parseRoutingTable coerces condition 'false' string to boolean false", () => {
+  const content = [
+    "routing:",
+    "  - name: brownfield",
+    "    classification: normal",
+    "    conditions:",
+    "      code_without_specs: false",
+    "    phases: [sdd-baseline]",
+    "    gates: []",
+    "    description: Brownfield.",
+  ].join("\n");
+
+  const routes = parseRoutingTable(content);
+  assert.equal(routes[0].conditions.code_without_specs, false);
+  assert.equal(typeof routes[0].conditions.code_without_specs, "boolean");
+});
+
+// (d) condition 'match: any' parses as string 'any' (NOT coerced to boolean)
+test("parseRoutingTable parses match:any as string 'any' (not boolean)", () => {
+  const content = [
+    "routing:",
+    "  - name: brownfield",
+    "    classification: normal",
+    "    conditions:",
+    "      match: any",
+    "      baseline.status: pending",
+    "    phases: [sdd-baseline]",
+    "    gates: []",
+    "    description: Brownfield.",
+  ].join("\n");
+
+  const routes = parseRoutingTable(content);
+  assert.equal(routes[0].conditions.match, "any");
+  assert.equal(typeof routes[0].conditions.match, "string");
+});
+
+// (e) top-level experimental: true coerces to boolean true (W2 fix)
+test("parseRoutingTable coerces top-level experimental:true string to boolean true", () => {
+  const content = [
+    "routing:",
+    "  - name: debug",
+    "    classification: small",
+    "    conditions:",
+    "      explicit_debug_intent: true",
+    "    phases: [sdd-explore, sdd-apply]",
+    "    gates: []",
+    "    description: Debug.",
+    "    experimental: true",
+  ].join("\n");
+
+  const routes = parseRoutingTable(content);
+  assert.equal(routes[0].experimental, true);
+  assert.equal(typeof routes[0].experimental, "boolean");
+});
+
+// (f) top-level experimental: false coerces to boolean false
+test("parseRoutingTable coerces top-level experimental:false string to boolean false", () => {
+  const content = [
+    "routing:",
+    "  - name: standard",
+    "    classification: normal",
+    "    conditions:",
+    "      project.status: active",
+    "    phases: [sdd-propose, sdd-apply]",
+    "    gates: []",
+    "    description: Standard.",
+    "    experimental: false",
+  ].join("\n");
+
+  const routes = parseRoutingTable(content);
+  assert.equal(routes[0].experimental, false);
+  assert.equal(typeof routes[0].experimental, "boolean");
 });

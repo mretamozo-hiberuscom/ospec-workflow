@@ -15,6 +15,7 @@ const test = require("node:test");
 const { runConfigure } = require("./cli.js");
 const { validate } = require("./validate-github-copilot.js");
 const { validate: validateOpencode } = require("./validate-opencode.js");
+const { matchConditions, parseRoutingTable, validateRouteTable } = require("../lib/route-dispatcher.js");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 
@@ -323,4 +324,61 @@ test("real repo: all four review-* skills propagate to opencode and github-copil
       );
     }
   }
+});
+
+test("real repo: live brownfield routing entry matches brownfield ctx and rejects baselined ctx", () => {
+  // (a) read live config.yaml from repo root
+  const configPath = path.join(ROOT, "openspec", "config.yaml");
+  const content = fs.readFileSync(configPath, "utf8");
+
+  // (b) parse and find brownfield entry
+  const parsed = parseRoutingTable(content);
+  const brownfield = parsed.find((r) => r.name === "brownfield");
+  assert.ok(brownfield, "brownfield route must exist in openspec/config.yaml");
+
+  const { conditions } = brownfield;
+
+  // (c) match mode is 'any'
+  assert.equal(conditions.match, "any", "brownfield conditions.match must be 'any'");
+
+  // (d) baseline.status is JS array ['pending', 'partial']
+  assert.deepEqual(
+    conditions["baseline.status"],
+    ["pending", "partial"],
+    "brownfield conditions baseline.status must deep-equal ['pending','partial']",
+  );
+
+  // (e) specs_empty_with_code is native boolean true
+  assert.equal(conditions.specs_empty_with_code, true);
+  assert.equal(typeof conditions.specs_empty_with_code, "boolean", "specs_empty_with_code must be a boolean");
+
+  // (f) code_without_specs is native boolean true
+  assert.equal(conditions.code_without_specs, true);
+  assert.equal(typeof conditions.code_without_specs, "boolean", "code_without_specs must be a boolean");
+
+  // (g) matchConditions with pending baseline returns true
+  assert.equal(
+    matchConditions(conditions, { "baseline.status": "pending" }),
+    true,
+    "brownfield conditions must match a pending-baseline ctx",
+  );
+
+  // (h) matchConditions with done baseline and all signals false returns false
+  assert.equal(
+    matchConditions(conditions, {
+      "baseline.status": "done",
+      specs_empty_with_code: false,
+      code_without_specs: false,
+    }),
+    false,
+    "brownfield conditions must NOT match a done-baseline ctx with all signals false",
+  );
+
+  // (i) validateRouteTable on the full parsed table returns valid: true
+  const tableResult = validateRouteTable(parsed);
+  assert.equal(
+    tableResult.valid,
+    true,
+    `routing table must be valid after C1 update; errors: ${JSON.stringify(tableResult.errors)}`,
+  );
 });

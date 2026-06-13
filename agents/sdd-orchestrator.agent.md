@@ -224,9 +224,23 @@ When `routing:` is absent from `openspec/config.yaml` or resolves to `[]`, the o
 
 When the routing table selects the `brownfield` route (Step 3 of Route Selection & Dispatch), execute the `brownfield-advisory` gate **before** any route phase begins.
 
+#### Derived Signal Computation
+
+Before evaluating brownfield conditions, the orchestrator MUST compute two derived boolean signals using its filesystem tools and pass them in the routing context (`ctx`) when `matchConditions` is called:
+
+- `specs_empty_with_code`: `true` when `openspec/specs/` exists but contains no `*/spec.md` domain files AND application source code is present in the repo. Computed by the orchestrator via a directory scan — this is file I/O and MUST NOT be performed by `route-dispatcher.js`.
+- `code_without_specs`: `true` when application source code is detected AND `openspec/specs/` is absent or empty. Computed the same way.
+
+Both signals are boolean. The dispatcher (`matchConditions`) receives these values in `ctx` and evaluates them with strict equality — it never reads the filesystem.
+
+The brownfield route is triggered when ANY of the following hold (matching `match: any` semantics):
+- `baseline.status` is `pending` or `partial`
+- `openspec/specs/` exists but contains no spec files while code is present (`specs_empty_with_code: true`)
+- Application code exists while `openspec/specs/` is absent or empty (`code_without_specs: true`)
+
 #### Session-Scoped Skip Suppression
 
-Check the current session context for the flag `_brownfield_advisory_shown`. If it is `true`, skip the advisory entirely and proceed directly with the originally requested SDD command. The flag is session-scoped only — it is NOT persisted to `state.yaml`. The advisory reappears in a new session whenever `baseline.status` remains `pending` or `partial`.
+Check the current session context for the flag `_brownfield_advisory_shown`. If it is `true`, skip the advisory entirely and proceed directly with the originally requested SDD command. The flag is session-scoped only — it is NOT persisted to `state.yaml`. The advisory reappears in a new session whenever brownfield conditions remain true.
 
 #### Brownfield Advisory (vscode/askQuestions)
 
@@ -237,7 +251,7 @@ If the session flag is not set, use `vscode/askQuestions` to present the two-opt
   "questions": [
     {
       "header": "Brownfield baseline advisory",
-      "question": "This repo has a pending baseline. Running sdd-baseline first captures existing architecture and reduces spec drift. Do you want to run it now?",
+      "question": "This repo appears brownfield (pending/partial baseline, empty specs dir with code present, or code without specs). Running sdd-baseline first captures existing architecture and reduces spec drift. Do you want to run it now?",
       "options": [
         {
           "label": "Run /sdd-baseline now",
