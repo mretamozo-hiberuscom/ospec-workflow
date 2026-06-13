@@ -7,8 +7,10 @@
 # Claude uses aliases (auto-track the latest model). VS Code uses
 # "Name (vendor)" strings; an array is a fallback order. The github-copilot
 # target injects no model (agents inherit the session model), so it has no column.
-# opencode uses "provider/model" slugs (verified against models.dev); edit these
-# as models.dev publishes newer Claude releases.
+# opencode uses "provider/model" slugs; edit these as models.dev publishes newer
+# releases. The opencode column below uses the OpenAI provider (openai/gpt-*).
+# NOTE: to run these GPT models through a GitHub Copilot subscription, change the
+# prefix from "openai/" to "github-copilot/" (e.g. github-copilot/gpt-5.5).
 
 agents:
   sdd-design: premium
@@ -28,15 +30,17 @@ agents:
   _default: default
 
 tiers:
+  # opencode: prefix is openai/. Switch to github-copilot/ to use these GPT
+  # models via a GitHub Copilot subscription.
   premium:
     claude: opus
     vscode: ["Claude Opus 4.8 (copilot)", "GPT-5.5 (copilot)"]
-    opencode: anthropic/claude-opus-4-8
+    opencode: openai/gpt-5.5
   default:
     claude: sonnet
     vscode: ["Claude Sonnet 4.6 (copilot)", "GPT-5.3-Codex (copilot)"]
-    opencode: anthropic/claude-sonnet-4-6
+    opencode: openai/gpt-5.4
   cheap:
     claude: haiku
     vscode: ["Qwen 3.6 MSC1 (customendpoint)", "GPT-5.4-mini (copilot)"]
-    opencode: anthropic/claude-haiku-4-6
+    opencode: openai/gpt-5.4-mini
