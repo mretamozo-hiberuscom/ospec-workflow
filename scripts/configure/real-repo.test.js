@@ -15,6 +15,7 @@ const test = require("node:test");
 const { runConfigure } = require("./cli.js");
 const { validate } = require("./validate-github-copilot.js");
 const { validate: validateOpencode } = require("./validate-opencode.js");
+const { matchConditions, parseRoutingTable, validateRouteTable } = require("../lib/route-dispatcher.js");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 
@@ -159,4 +160,234 @@ test("real repo: sdd-clarify skill propagates to opencode and github-copilot", (
       `sdd-clarify SKILL.md missing from ${target} output`
     );
   }
+});
+
+test("real repo: orchestrator conditional clarify references residual_ambiguity", (t) => {
+  const out = tmpOut(t);
+  runConfigure({ sourceDir: ROOT, target: "vscode", outDir: out, validate: false });
+
+  const orchestratorPath = path.join(out, "agents", "sdd-orchestrator.agent.md");
+  assert.ok(
+    fs.existsSync(orchestratorPath),
+    "sdd-orchestrator.agent.md missing from vscode output"
+  );
+
+  const text = fs.readFileSync(orchestratorPath, "utf8");
+  assert.match(
+    text,
+    /residual_ambiguity/,
+    "sdd-orchestrator must reference residual_ambiguity for conditional clarify gate"
+  );
+});
+
+test("real repo: sdd-foundation agent mentions markitdown degradation", (t) => {
+  const targetPaths = {
+    claude: "agents/sdd-foundation.md",
+    vscode: "agents/sdd-foundation.agent.md",
+    "github-copilot": ".github/agents/sdd-foundation.agent.md",
+    opencode: ".opencode/agents/sdd-foundation.md",
+  };
+
+  for (const [target, expectedPath] of Object.entries(targetPaths)) {
+    const out = tmpOut(t);
+    runConfigure({ sourceDir: ROOT, target, outDir: out, validate: false });
+
+    assert.ok(
+      fs.existsSync(path.join(out, expectedPath)),
+      `sdd-foundation agent missing from ${target} output at ${expectedPath}`
+    );
+
+    const text = fs.readFileSync(path.join(out, expectedPath), "utf8");
+    assert.match(
+      text,
+      /mcp__microsoft_markitdown__convert_to_markdown/,
+      `sdd-foundation agent (${target}) must reference mcp__microsoft_markitdown__convert_to_markdown`
+    );
+    assert.match(
+      text,
+      /fallback|degradation/i,
+      `sdd-foundation agent (${target}) must contain a fallback/degradation reference`
+    );
+  }
+});
+
+test("real repo: orchestrator brownfield route replaces standalone Baseline Advisory", (t) => {
+  const out = tmpOut(t);
+  runConfigure({ sourceDir: ROOT, target: "vscode", outDir: out, validate: false });
+
+  const orchestratorPath = path.join(out, "agents", "sdd-orchestrator.agent.md");
+  assert.ok(
+    fs.existsSync(orchestratorPath),
+    "sdd-orchestrator.agent.md missing from vscode output"
+  );
+
+  const text = fs.readFileSync(orchestratorPath, "utf8");
+  assert.doesNotMatch(
+    text,
+    /### Baseline Advisory \(optional, brownfield repos only\)/,
+    "sdd-orchestrator must NOT contain the standalone Baseline Advisory heading"
+  );
+  assert.match(
+    text,
+    /Brownfield Route Handler/,
+    "sdd-orchestrator must contain Brownfield Route Handler section"
+  );
+});
+
+test("real repo: review-risk agent propagates to all four targets", (t) => {
+  const targetPaths = {
+    claude: "agents/review-risk.md",
+    vscode: "agents/review-risk.agent.md",
+    "github-copilot": ".github/agents/review-risk.agent.md",
+    opencode: ".opencode/agents/review-risk.md",
+  };
+
+  for (const [target, expectedPath] of Object.entries(targetPaths)) {
+    const out = tmpOut(t);
+    runConfigure({ sourceDir: ROOT, target, outDir: out, validate: false });
+    assert.ok(
+      fs.existsSync(path.join(out, expectedPath)),
+      `review-risk agent missing from ${target} output at ${expectedPath}`
+    );
+  }
+});
+
+test("real repo: review-readability agent propagates to all four targets", (t) => {
+  const targetPaths = {
+    claude: "agents/review-readability.md",
+    vscode: "agents/review-readability.agent.md",
+    "github-copilot": ".github/agents/review-readability.agent.md",
+    opencode: ".opencode/agents/review-readability.md",
+  };
+
+  for (const [target, expectedPath] of Object.entries(targetPaths)) {
+    const out = tmpOut(t);
+    runConfigure({ sourceDir: ROOT, target, outDir: out, validate: false });
+    assert.ok(
+      fs.existsSync(path.join(out, expectedPath)),
+      `review-readability agent missing from ${target} output at ${expectedPath}`
+    );
+  }
+});
+
+test("real repo: review-reliability agent propagates to all four targets", (t) => {
+  const targetPaths = {
+    claude: "agents/review-reliability.md",
+    vscode: "agents/review-reliability.agent.md",
+    "github-copilot": ".github/agents/review-reliability.agent.md",
+    opencode: ".opencode/agents/review-reliability.md",
+  };
+
+  for (const [target, expectedPath] of Object.entries(targetPaths)) {
+    const out = tmpOut(t);
+    runConfigure({ sourceDir: ROOT, target, outDir: out, validate: false });
+    assert.ok(
+      fs.existsSync(path.join(out, expectedPath)),
+      `review-reliability agent missing from ${target} output at ${expectedPath}`
+    );
+  }
+});
+
+test("real repo: review-resilience agent propagates to all four targets", (t) => {
+  const targetPaths = {
+    claude: "agents/review-resilience.md",
+    vscode: "agents/review-resilience.agent.md",
+    "github-copilot": ".github/agents/review-resilience.agent.md",
+    opencode: ".opencode/agents/review-resilience.md",
+  };
+
+  for (const [target, expectedPath] of Object.entries(targetPaths)) {
+    const out = tmpOut(t);
+    runConfigure({ sourceDir: ROOT, target, outDir: out, validate: false });
+    assert.ok(
+      fs.existsSync(path.join(out, expectedPath)),
+      `review-resilience agent missing from ${target} output at ${expectedPath}`
+    );
+  }
+});
+
+test("real repo: all four review-* skills propagate to opencode and github-copilot", (t) => {
+  const skillRels = [
+    "skills/review-risk/SKILL.md",
+    "skills/review-readability/SKILL.md",
+    "skills/review-reliability/SKILL.md",
+    "skills/review-resilience/SKILL.md",
+  ];
+
+  for (const target of ["opencode", "github-copilot"]) {
+    const out = tmpOut(t);
+    runConfigure({ sourceDir: ROOT, target, outDir: out, validate: false });
+    for (const skillRel of skillRels) {
+      assert.ok(
+        fs.existsSync(path.join(out, skillRel)),
+        `${skillRel} missing from ${target} output`
+      );
+    }
+  }
+});
+
+// openspec/ is gitignored, so config.yaml ships only in a local working tree, not
+// in a fresh CI checkout. This guard self-skips the live-config assertion when the
+// file is absent (matching e2e.test.js); the matchConditions/parser behavior itself
+// is covered deterministically by the route-dispatcher unit tests.
+const LIVE_CONFIG_PATH = path.join(ROOT, "openspec", "config.yaml");
+const HAS_LIVE_CONFIG = fs.existsSync(LIVE_CONFIG_PATH);
+
+test(
+  "real repo: live brownfield routing entry matches brownfield ctx and rejects baselined ctx",
+  { skip: HAS_LIVE_CONFIG ? false : "openspec/config.yaml not present (gitignored; local dev only)" },
+  () => {
+  // (a) read live config.yaml from repo root
+  const content = fs.readFileSync(LIVE_CONFIG_PATH, "utf8");
+
+  // (b) parse and find brownfield entry
+  const parsed = parseRoutingTable(content);
+  const brownfield = parsed.find((r) => r.name === "brownfield");
+  assert.ok(brownfield, "brownfield route must exist in openspec/config.yaml");
+
+  const { conditions } = brownfield;
+
+  // (c) match mode is 'any'
+  assert.equal(conditions.match, "any", "brownfield conditions.match must be 'any'");
+
+  // (d) baseline.status is JS array ['pending', 'partial']
+  assert.deepEqual(
+    conditions["baseline.status"],
+    ["pending", "partial"],
+    "brownfield conditions baseline.status must deep-equal ['pending','partial']",
+  );
+
+  // (e) specs_empty_with_code is native boolean true
+  assert.equal(conditions.specs_empty_with_code, true);
+  assert.equal(typeof conditions.specs_empty_with_code, "boolean", "specs_empty_with_code must be a boolean");
+
+  // (f) code_without_specs is native boolean true
+  assert.equal(conditions.code_without_specs, true);
+  assert.equal(typeof conditions.code_without_specs, "boolean", "code_without_specs must be a boolean");
+
+  // (g) matchConditions with pending baseline returns true
+  assert.equal(
+    matchConditions(conditions, { "baseline.status": "pending" }),
+    true,
+    "brownfield conditions must match a pending-baseline ctx",
+  );
+
+  // (h) matchConditions with done baseline and all signals false returns false
+  assert.equal(
+    matchConditions(conditions, {
+      "baseline.status": "done",
+      specs_empty_with_code: false,
+      code_without_specs: false,
+    }),
+    false,
+    "brownfield conditions must NOT match a done-baseline ctx with all signals false",
+  );
+
+  // (i) validateRouteTable on the full parsed table returns valid: true
+  const tableResult = validateRouteTable(parsed);
+  assert.equal(
+    tableResult.valid,
+    true,
+    `routing table must be valid after C1 update; errors: ${JSON.stringify(tableResult.errors)}`,
+  );
 });

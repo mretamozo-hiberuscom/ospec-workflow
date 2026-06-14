@@ -41,6 +41,53 @@ Run this phase when a project has `openspec/config.yaml` but little or no detect
 | Noisy docs present | Normalize into processed references with traceability to raw files. |
 | Enough foundation facts | Update docs and `openspec/config.yaml`; recommend first SDD change. |
 
+## Markitdown Document Ingestion (Optional)
+
+Before launching the first discovery question, offer document ingestion to the user.
+
+### Step 1 — Offer via vscode/askQuestions
+
+Ask the user whether they have project documents (PDF, functional spec, architecture doc, etc.)
+they want to contribute as foundation context. This call MUST happen before any discovery
+question is asked. Use `vscode/askQuestions` with two options:
+
+- **Yes, I have documents** — proceed to Step 2.
+- **No, skip** — proceed directly to manual discovery (Step 3).
+
+If the user declines or provides no documents, proceed to Step 3 immediately.
+
+### Step 2 — MCP ingestion (when user confirms documents available)
+
+For each document the user supplies:
+
+1. Check whether `mcp__microsoft_markitdown__convert_to_markdown` is available on the current
+   target. If it is NOT available, skip to Step 3 (silent fallback — do not tell the user).
+2. Call `mcp__microsoft_markitdown__convert_to_markdown` with the document path or content.
+3. On success:
+   - Preserve the raw source under `docs/references/raw/` (filename unchanged).
+   - Write the converted markdown to `docs/references/processed/` (same base name, `.md`
+     extension).
+   - Collect all converted content; pass it as additional context when launching `sdd-foundation`
+     for the first discovery cycle.
+4. On MCP error for any single document:
+   - Log the error internally (e.g., a note in the agent's working context).
+   - Do **NOT** surface the error to the user as a workflow blocker or warning.
+   - Treat the document as if it were not supplied; continue with any remaining documents.
+   - If all documents fail, proceed to Step 3.
+
+### Step 3 — Manual discovery fallback
+
+Proceed with the standard one-question-at-a-time guided discovery defined in `## Execution Steps`
+below. This path is always safe and is the default when:
+
+- The user declines the ingestion offer.
+- `mcp__microsoft_markitdown__convert_to_markdown` is unavailable on the active target.
+- The MCP tool returns an error for every supplied document.
+- The target is `github-copilot` or `opencode` and does not have the MCP configured.
+
+**NEVER** surface MCP absence or MCP errors as workflow blockers. The foundation route MUST
+proceed regardless of MCP availability.
+
 ## Execution Steps
 
 1. Load shared SDD rules and project standards if provided by the orchestrator.

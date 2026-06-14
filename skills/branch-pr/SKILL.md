@@ -22,6 +22,10 @@ Use this skill when:
 2. **Every PR MUST have exactly one `type:*` label**
 3. **Automated checks must pass** before merge is possible
 4. **Blank PRs without issue linkage will be blocked** by GitHub Actions
+5. **No model/tool attribution** in the PR title, body, or comments — never include
+   `Generated with`, a 🤖 footer, or any mention of Claude, Claude Code, Anthropic,
+   GPT, OpenAI, Codex, Copilot, Gemini, or any other model/vendor. See
+   `rules/no-model-attribution.instructions.md`.
 
 ---
 
@@ -121,6 +125,7 @@ All boxes must be checked:
 - Docs updated if behavior changed
 - Conventional commit format
 - No `Co-Authored-By` trailers
+- No model/tool attribution in commits or PR body (no Claude/GPT/Gemini/Copilot/etc., no 🤖 footer)
 
 ---
 

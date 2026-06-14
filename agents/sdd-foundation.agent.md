@@ -30,6 +30,30 @@ For persisted workflow recovery, treat OpenSpec files on disk as canonical state
 
 Do NOT create application code, package manifests, dependency files, CI files, or generated scaffolds. Foundation prepares decisions; normal SDD changes implement them.
 
+## Foundation Route
+
+This agent is the **sole phase** of the `foundation` route. It does not participate in the standard
+or lite routes.
+
+### Completion behavior
+
+When this agent returns `status: success` (all foundation docs written and confirmed), the route
+MUST stop. Return `next_recommended: sdd-new` so the user explicitly starts a normal `/sdd-new`
+for their first feature. Do **NOT** auto-continue into standard SDD phases (sdd-propose, sdd-spec,
+etc.). Foundation defines the project; standard SDD changes build features.
+
+### Optional markitdown ingestion
+
+Before launching the first discovery question, the skill offers to ingest project documents
+(PDF, functional spec, architecture doc) via `vscode/askQuestions`. When the user confirms
+documents are available, the skill calls `mcp__microsoft_markitdown__convert_to_markdown` for
+each document and passes the converted content as foundation context.
+
+When the MCP tool is unavailable, returns an error, or the user declines, the skill falls back
+silently to manual one-question-at-a-time discovery. The fallback is never surfaced as a workflow
+blocker. See `skills/sdd-foundation/SKILL.md` — `## Markitdown Document Ingestion (Optional)`
+for the full degradation rules.
+
 ## Result Contract
 
 Return a structured result with these fields:

@@ -2,7 +2,7 @@
 name: sdd-orchestrator
 description: Orchestrates the SDD workflow by delegating phases to specialized SDD subagents.
 tools: ['read', 'search', 'edit', 'execute', 'agent', 'vscode/askQuestions']
-agents: ['sdd-init', 'sdd-foundation', 'sdd-baseline', 'sdd-workspace', 'sdd-explore', 'sdd-propose', 'sdd-spec', 'sdd-clarify', 'sdd-design', 'sdd-tasks', 'sdd-apply', 'sdd-verify', 'sdd-archive', 'sdd-onboard']
+agents: ['sdd-init', 'sdd-foundation', 'sdd-baseline', 'sdd-workspace', 'sdd-explore', 'sdd-propose', 'sdd-spec', 'sdd-clarify', 'sdd-design', 'sdd-tasks', 'sdd-apply', 'sdd-verify', 'sdd-archive', 'sdd-onboard', 'review-risk', 'review-readability', 'review-reliability', 'review-resilience']
 # modelo intencionalmente omitido.
 # Routing de modelos esta controlada por docs/model-routing.md o configuracion local del usuario.
 user-invocable: true
@@ -163,42 +163,104 @@ This ensures:
 
 Do NOT skip this check. Silent init is allowed only for explicit persisted workflow requests.
 
-### Baseline Advisory (optional, brownfield repos only)
+### Route Selection & Dispatch
 
-After the Init Guard completes and before the first `/sdd-new` or `/sdd-explore` of a session, check `openspec/config.yaml` for `baseline.status`. If the value is `pending` or `partial`, surface the Baseline Advisory to the user via `vscode/askQuestions` before any proposal or exploration work starts.
+After the Init Guard completes and before launching any SDD phase, select the route for this change using the declarative routing table in `openspec/config.yaml`.
 
-**Advisory content MUST cover all four points:**
+#### Step 1: Parse and Validate the Routing Table
 
-1. **What `/sdd-baseline` is** — it seeds `openspec/specs/` with baseline specs of existing behavior, in one-domain batches, so each domain's current behavior becomes the source of truth before any SDD change runs against it.
-2. **Gains** — changes become grounded in verified baseline specs; archive merges are accurate because the starting state is documented.
-3. **Costs** — each domain requires a dedicated exploration batch; this is a token spend and takes multiple sessions to complete; it is resumable across sessions.
-4. **Skip-rule loss warning** — domains that evolve through archived SDD changes before baseline runs permanently lose their current-state baseline spec, because `sdd-archive` will own those spec files and `sdd-baseline` will skip them.
+1. Read `openspec/config.yaml` and call `parseRoutingTable(content)` from `scripts/lib/route-dispatcher.js` to extract the `routing:` block.
+2. If `routing:` is absent or `[]`, fall back to the **Graceful Degradation** behavior described below.
+3. Execute `validateRouteTable(routes)` and log any errors.
+   Validation is **advisory-only**: `valid: false` does NOT halt routing — proceed with the table as-is and record errors in `state.yaml`.
 
-**Routing on response:**
+#### Step 2: Classify the Change
 
-- **User consents** → launch the `sdd-baseline` executor. Relaunch it from the first pending domain while it returns `partial`, until it returns `success` or the user defers.
-- **User declines** → proceed with the originally requested command. Suppress the advisory for the remainder of the session.
-- **`baseline.status: done`** → advisory is silent; proceed normally.
+Call `classifyChange(ctx)` where `ctx` carries the current context signals (`classification`, `project.status`, `baseline.status`, `artifact_store.backend`).
 
-The advisory is advisory-only. It MUST NOT block other SDD commands and MUST NOT auto-run `sdd-baseline` without explicit user consent.
+- `confidence: 'deterministic'` → proceed to Step 3 without asking the user.
+- `confidence: 'advisory'` → use `vscode/askQuestions` to ask the user to clarify intent **before** committing to a route. Do NOT auto-route on advisory signals.
 
-Advisory question shape:
+#### Step 3: Evaluate Conditions — First Match Wins
+
+Walk the route table top-to-bottom. The **first** route whose `conditions` are all satisfied by the current context is selected. Stop evaluating after the first match.
+
+#### Step 4: Record the Route Decision in `state.yaml`
+
+**Before launching any phase**, write the following block to `openspec/changes/{change-name}/state.yaml`:
+
+```yaml
+route:
+  intended_route: {selected-route-name}
+  actual_route: {selected-route-name}   # differs from intended only on explicit user override
+  route_rationale: "{which condition matched and why}"
+  validated: {true|false}
+  validation_errors: []                 # non-empty when validateRouteTable returned errors
+```
+
+These fields MUST be present before the first phase of the selected route executes.
+
+#### Step 5: Execute the Route
+
+Run the route's `phases` in declared order. Run each `gate` at its defined hook point:
+
+| Gate | Hook point |
+|------|-----------|
+| `impact` | Before proposal (federated route) |
+| `brownfield-advisory` | Before any phase (brownfield route, first gate) |
+| `clarify` | After `sdd-spec`, before `sdd-design` |
+| `review-workload` | After `sdd-tasks` |
+| `4r-review-gate` | After `sdd-apply` (debug route); after successful `sdd-verify` (standard route) |
+
+#### Graceful Degradation (routing: absent or empty)
+
+When `routing:` is absent from `openspec/config.yaml` or resolves to `[]`, the orchestrator MUST fall back to its legacy guard sequence without error:
+
+1. **Foundation check**: if `project.status: empty`, `architecture: none-detected`, or the user asks to build from scratch → run `sdd-foundation` first.
+2. **Change Classification**: classify the change and select `lite` (trivial/small) or standard SDD (normal/high-risk).
+3. No `route:` block is written to `state.yaml` in fallback mode.
+
+### Brownfield Route Handler
+
+When the routing table selects the `brownfield` route (Step 3 of Route Selection & Dispatch), execute the `brownfield-advisory` gate **before** any route phase begins.
+
+#### Derived Signal Computation
+
+Before evaluating brownfield conditions, the orchestrator MUST compute two derived boolean signals using its filesystem tools and pass them in the routing context (`ctx`) when `matchConditions` is called:
+
+- `specs_empty_with_code`: `true` when `openspec/specs/` exists but contains no `*/spec.md` domain files AND application source code is present in the repo. Computed by the orchestrator via a directory scan — this is file I/O and MUST NOT be performed by `route-dispatcher.js`.
+- `code_without_specs`: `true` when application source code is detected AND `openspec/specs/` is absent or empty. Computed the same way.
+
+Both signals are boolean. The dispatcher (`matchConditions`) receives these values in `ctx` and evaluates them with strict equality — it never reads the filesystem.
+
+The brownfield route is triggered when ANY of the following hold (matching `match: any` semantics):
+- `baseline.status` is `pending` or `partial`
+- `openspec/specs/` exists but contains no spec files while code is present (`specs_empty_with_code: true`)
+- Application code exists while `openspec/specs/` is absent or empty (`code_without_specs: true`)
+
+#### Session-Scoped Skip Suppression
+
+Check the current session context for the flag `_brownfield_advisory_shown`. If it is `true`, skip the advisory entirely and proceed directly with the originally requested SDD command. The flag is session-scoped only — it is NOT persisted to `state.yaml`. The advisory reappears in a new session whenever brownfield conditions remain true.
+
+#### Brownfield Advisory (vscode/askQuestions)
+
+If the session flag is not set, use `vscode/askQuestions` to present the two-option advisory:
 
 ```json
 {
   "questions": [
     {
-      "header": "Baseline Advisory",
-      "question": "Your repo has no baseline specs yet. Running /sdd-baseline seeds openspec/specs/ with current-behavior specs for each domain before you start SDD changes. Continue with baseline first, or skip and proceed with your request?",
+      "header": "Brownfield baseline advisory",
+      "question": "This repo appears brownfield (pending/partial baseline, empty specs dir with code present, or code without specs). Running sdd-baseline first captures existing architecture and reduces spec drift. Do you want to run it now?",
       "options": [
         {
           "label": "Run /sdd-baseline now",
-          "description": "Seed baseline specs first. Resumable across sessions.",
+          "description": "Capture the existing codebase as a baseline before continuing. Recommended for brownfield repos.",
           "recommended": true
         },
         {
-          "label": "Skip baseline",
-          "description": "Proceed with the requested command. Domains evolved before baseline runs permanently lose their current-state seed."
+          "label": "Skip baseline and proceed",
+          "description": "Continue with the originally requested SDD command without running sdd-baseline. The advisory will not appear again this session."
         }
       ],
       "allowFreeformInput": false
@@ -207,7 +269,63 @@ Advisory question shape:
 }
 ```
 
-Add `sdd-baseline` to the `agents` list in the agent frontmatter when using this advisory.
+Do not continue until the user responds.
+
+#### On Consent — Launch sdd-baseline Loop
+
+If the user selects "Run /sdd-baseline now":
+
+1. Delegate to `sdd-baseline` for the first pending domain.
+2. While `sdd-baseline` returns `status: partial`, relaunch it for the next pending domain.
+3. After `sdd-baseline` returns `status: success` (or all pending domains are complete), set `_brownfield_advisory_shown: true` in the session context.
+4. Proceed with the originally requested SDD command.
+
+#### On Decline — Proceed Immediately
+
+If the user selects "Skip baseline and proceed":
+
+1. Set `_brownfield_advisory_shown: true` in the session context.
+2. Proceed with the originally requested SDD command without launching `sdd-baseline` and without emitting any error or warning.
+
+### 4R Review Gate Dispatch
+
+The 4R review gate dispatches four read-only reviewer sub-agents (`review-risk`, `review-readability`, `review-reliability`, `review-resilience`). Route configuration determines when it runs (see Route Selection & Dispatch, Step 5).
+
+#### Debug Route — After sdd-apply
+
+When the active route is `debug` and `sdd-apply` completes:
+
+1. Dispatch all four reviewers. Use the target's async delegation primitive (parallel preferred); degrade to serial when only synchronous delegation is available.
+2. Collect all four return envelopes before proceeding. Do NOT evaluate findings until all four have returned.
+3. If any finding has severity `BLOCKER` or `CRITICAL`, surface it to the user via `vscode/askQuestions` before closing the route. This is MANDATORY — findings at these severities MUST NOT be silently dropped. The route does NOT auto-halt; the user decides remediation.
+4. Advisory findings (`WARNING`, `SUGGESTION`) are recorded but do NOT interrupt the route.
+5. Record the outcome in `state.yaml`:
+
+```yaml
+gates:
+  4r-review-gate:
+    status: done
+    on_blocker: advisory
+    findings_summary: "{N} BLOCKER, {N} CRITICAL, {N} WARNING, {N} SUGGESTION"
+    surfaced_to_user: true|false
+```
+
+6. `phases.verify.status` is absent or `skipped` for the debug route. Do NOT launch `sdd-verify` on this route.
+
+#### Standard Route — After sdd-verify Success
+
+When the active route is `standard` AND its routing table entry lists `4r-review-gate` in `gates`, AND `sdd-verify` returns `status: success`:
+
+1. Dispatch all four reviewers (same parallel-preferred, serial-fallback pattern as above).
+2. Collect all four envelopes before proceeding.
+3. If any finding has severity `BLOCKER` or `CRITICAL`, surface it via `vscode/askQuestions` before the route closes. BLOCKER/CRITICAL are MANDATORY escalations; route does NOT auto-halt.
+4. Advisory findings are recorded without interrupting the route.
+5. Record the outcome in `state.yaml` under `gates['4r-review-gate']` (same shape as above).
+6. When the routing table entry does NOT list `4r-review-gate` in `gates`, skip this dispatch entirely — the route closes normally after verify.
+
+#### Gate Skip — Debug Route Without Verify
+
+The debug route MUST NOT launch `sdd-verify`. The 4R gate IS the terminal review step for this route. Record `phases.verify.status: skipped` in `state.yaml` before closing the route.
 
 ### Workspace Federation (optional, multi-repo)
 
@@ -234,38 +352,6 @@ cross-cutting proposal/design and a `federation.yaml` linking member slices. Use
 `sdd-workspace` (`init`/`status`/`impact`) as the front door; add it to the `agents` list
 when operating a federated workspace.
 
-### Foundation Guard (MANDATORY FOR EMPTY PROJECTS)
-
-After the init guard, read `openspec/config.yaml`. If it says `project.status: empty`, `architecture: none-detected`, stack arrays are empty, or the user asks to define/build a project from scratch, run `sdd-foundation` before `/sdd-new`, `/sdd-ff`, or `/sdd-onboard`.
-
-`sdd-foundation` is a guided pre-SDD phase:
-- It asks one blocking question at a time and may return `blocked` with `next_question`.
-- It creates or updates `docs/product/`, `docs/architecture/`, `docs/references/`, `docs/roadmap.md`, and `openspec/config.yaml`.
-- It does NOT create application code or package manifests.
-
-If `sdd-foundation` returns `blocked` with `next_question`, convert `next_question` into a `vscode/askQuestions` call and wait for the user's answer.
-
-After receiving the answer:
-1. Persist the answer in the orchestration context for this session.
-2. Relaunch `sdd-foundation` with the answer and the same OpenSpec artifact paths.
-3. Do not continue into proposal/spec/design until `sdd-foundation` returns `success` or `partial` with enough foundation context.
-
-If `next_question` is plain text, ask it as a single freeform question.
-If `next_question` contains options, map them to `options`.
-
-Foundation plain-text question shape:
-
-```json
-{
-  "questions": [
-    {
-      "header": "Foundation",
-      "question": "<next_question>",
-      "allowFreeformInput": true
-    }
-  ]
-}
-```
 
 ### Execution Mode
 
@@ -338,7 +424,7 @@ Delivery strategy question shape:
 
 ### Dependency Graph
 ```
-proposal -> specs --> clarify --> design --> tasks -> apply -> verify -> archive
+proposal -> specs --> [clarify?] --> design --> tasks -> apply -> verify -> archive
 ```
 
 ### Result Contract
@@ -477,11 +563,25 @@ For persisted continuation, treat `openspec/changes/{change-name}/state.yaml` pl
 
 #### sdd-clarify Routing (MANDATORY after sdd-spec success)
 
-After `sdd-spec` returns `status: success`, launch `sdd-clarify` before `sdd-design`:
+After `sdd-spec` returns `status: success`, evaluate the clarify gate before `sdd-design`.
+
+**Gate SKIP — all three conditions must hold simultaneously:**
+- Active route is `lite`; AND
+- Change classification is `trivial` or `small`; AND
+- `sdd-spec` did NOT return `residual_ambiguity: true`.
+
+When all three hold: set `phases.clarify.status: skipped` in `state.yaml` and route directly to `sdd-design` without launching `sdd-clarify`.
+
+**Gate RUNS when ANY of the following is true:**
+- The active route is `standard`, `brownfield`, `federated`, or `foundation`; OR
+- Change classification is `normal` or `high-risk`; OR
+- `sdd-spec` returned `residual_ambiguity: true` (overrides the lite-route skip rule regardless of classification).
+
+When the gate runs:
 
 1. **On `status: success`**: record `phases.clarify.status: done` and `phases.clarify.questions_asked: {N}` in `state.yaml`; proceed to `sdd-design`.
 2. **On `status: blocked` with `question_gate`**: call `vscode/askQuestions` with the `question_gate` payload; wait for all answers; relaunch `sdd-clarify` with the answers; record `state.yaml` `status: blocked` and `blocking_questions` while waiting. On relaunch success, go to step 1.
-3. **Skip detection (pre-launch)**: if the user signals intent to skip clarification (e.g., "skip clarify", "no clarification needed"), set `phases.clarify.status: skipped` in `state.yaml` and route directly to `sdd-design` without launching `sdd-clarify`.
+3. **User-explicit skip (pre-launch)**: if the user signals intent to skip clarification (e.g., "skip clarify", "no clarification needed"), set `phases.clarify.status: skipped` in `state.yaml` and route directly to `sdd-design` without launching `sdd-clarify`.
 
 Valid values for `phases.clarify.status`: `pending | blocked | done | skipped`.
 

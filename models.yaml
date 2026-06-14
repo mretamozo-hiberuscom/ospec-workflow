@@ -27,6 +27,10 @@ agents:
   sdd-baseline: default
   sdd-explore: cheap
   sdd-archive: cheap
+  review-risk: cheap
+  review-readability: cheap
+  review-reliability: cheap
+  review-resilience: cheap
   _default: default
 
 tiers:

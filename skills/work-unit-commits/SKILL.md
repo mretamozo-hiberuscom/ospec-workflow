@@ -30,6 +30,7 @@ Use it for:
 | Tell a story | A reviewer should understand why each commit exists from its diff and message. |
 | Future PR-ready | Each commit should be a candidate chained PR when the change grows. |
 | Spanish imperative message | Keep the Conventional Commit type in English, but write the subject and body in Spanish imperative prose. |
+| No model attribution | Never add `Co-Authored-By`, a 🤖 footer, or any model/tool name (Claude, GPT, Gemini, Copilot, etc.) to a commit or PR. See `rules/no-model-attribution.instructions.md`. |
 | SDD workload guard | If SDD tasks forecast a >400-line change, group commits into chained PR slices before implementation. |
 
 ## Work Unit Checklist

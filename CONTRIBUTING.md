@@ -37,6 +37,12 @@ Add or update tests for any change to `scripts/`. Hook scripts use CommonJS
 
 - Use conventional-commit style prefixes (`feat:`, `fix:`, `docs:`, `chore:`,
   `refactor:`) — the history already follows this.
+- **No model/tool attribution.** Commit messages and pull requests (title, body,
+  comments) MUST NOT credit an AI model or coding tool: no `Co-Authored-By:` model
+  trailers, no "Generated with/by", no 🤖 footer, and no mention of Claude, Claude
+  Code, Anthropic, GPT, OpenAI, Codex, Copilot, Gemini, or any other model/vendor.
+  This applies to human and AI contributors alike — see
+  `rules/no-model-attribution.instructions.md`.
 - Bump `.plugin.json` and `.claude-plugin/plugin.json` per
   [SemVer](https://semver.org/): patch for non-behavioral fixes, minor for
   backward-compatible capability, major for breaking the trust surface or phase

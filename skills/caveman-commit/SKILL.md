@@ -16,7 +16,7 @@ Load when the user asks for a commit message or invokes `/commit` or `/caveman-c
 - Use Conventional Commits: `<type>(<scope>): <imperative Spanish summary>`.
 - Prefer subject length <=50 chars; hard cap 72 chars.
 - Write the summary in Spanish imperative: `añade`, `corrige`, `elimina`; never participles like `añadido`, gerunds like `añadiendo`, or infinitives like `añadir`.
-- Do not add `Co-Authored-By`, AI attribution, emojis, "I", "we", or "this commit".
+- Do not add `Co-Authored-By`, AI attribution, emojis, "I", "we", or "this commit". NEVER name any model or tool (Claude, Claude Code, Anthropic, GPT, OpenAI, Codex, Copilot, Gemini, etc.) as author or generator. See `rules/no-model-attribution.instructions.md`.
 - Add a Spanish body only for non-obvious why, breaking changes, migrations, security fixes, reverts, or linked issues.
 - Wrap body at 72 chars. Use `BREAKING CHANGE:` for breaking changes.
 - Do not stage, commit, amend, or modify files.

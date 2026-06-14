@@ -137,3 +137,62 @@ openspec/changes/archive/YYYY-MM-DD-{change-name}/
 ```
 
 Use today's date in ISO format. The archive is an AUDIT TRAIL — never delete or modify archived changes.
+
+## Route and Gate Audit Fields in `state.yaml`
+
+The orchestrator writes route and gate audit fields to `state.yaml` as part of the routing dispatch (see `agents/sdd-orchestrator.agent.md §Route Selection & Dispatch`).
+
+### `route:` block
+
+Written **before** the first phase of the selected route executes.
+
+```yaml
+route:
+  intended_route: standard          # route name selected by condition evaluation
+  actual_route: standard            # differs from intended only on explicit user override
+  route_rationale: "classification=normal; project.status=active -> standard"
+  validated: true                   # result of validateRouteTable(routes).valid
+  validation_errors: []             # non-empty when validateRouteTable returned errors
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `intended_route` | string | Route name selected by top-to-bottom condition evaluation |
+| `actual_route` | string | Route actually executed; differs from `intended_route` only when the user manually overrides after route selection |
+| `route_rationale` | string | Non-empty prose explaining which condition matched and why |
+| `validated` | boolean | `true` when `validateRouteTable` returned `valid: true` for the parsed table |
+| `validation_errors` | string[] | Errors returned by `validateRouteTable`; empty array on clean table |
+
+### `gates:` block
+
+Written at each gate's hook point during route execution.
+
+```yaml
+gates:
+  clarify:
+    status: done           # pending | blocked | done | skipped
+    questions_asked: 2
+  4r-review-gate:
+    status: done
+    on_blocker: advisory   # advisory (default) | halt
+    findings_summary: "0 BLOCKER, 1 WARNING"
+    surfaced_to_user: true
+```
+
+Gate `status` values:
+
+| Value | Meaning |
+|-------|---------|
+| `pending` | Gate has not yet run for this change |
+| `blocked` | Gate returned `status: blocked`; waiting for user input |
+| `done` | Gate completed successfully |
+| `skipped` | Gate was explicitly skipped (e.g. clarify skipped for lite+trivial) |
+
+Gate-specific fields (optional, vary by gate):
+
+| Gate | Field | Description |
+|------|-------|-------------|
+| `clarify` | `questions_asked` | Number of clarification questions answered |
+| `4r-review-gate` | `on_blocker` | Policy applied to BLOCKER findings (`advisory` default) |
+| `4r-review-gate` | `findings_summary` | Human-readable count of findings by severity |
+| `4r-review-gate` | `surfaced_to_user` | `true` when BLOCKER/CRITICAL findings were shown via `vscode/askQuestions` |
