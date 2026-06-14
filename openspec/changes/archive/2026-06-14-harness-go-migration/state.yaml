@@ -1,7 +1,7 @@
 change: "harness-go-migration"
-status: "verified"
+status: "archived"
 classification: "normal"
-last_updated: "2026-06-15T00:30:00Z"
+last_updated: "2026-06-14T19:57:00Z"
 
 blocking_questions: []
 
@@ -94,7 +94,8 @@ phases:
     artifact: "openspec/changes/harness-go-migration/verify-report.md"
     verdict: "PASS WITH WARNINGS"
   archive:
-    status: "pending"
+    status: "done"
+    artifact: "openspec/changes/harness-go-migration/archive-report.md"
 
 gates:
   4r-review-gate:

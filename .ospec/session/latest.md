@@ -1,9 +1,11 @@
 # Latest Session
 
-- Active change: `harness-go-migration`
-- Current phase: `archive-pending` (apply + verify + 4R gate completos)
-- Change status: `verified` (PASS WITH WARNINGS)
-- Detailed summary: `.ospec/session/harness-go-migration/session-summary.md`
+- Ended at: `2026-06-14T17:57:43.3244946Z`
+- Session: `unknown`
+- Active change: `None`
+- Current phase: `None`
+- Change status: `None`
+- Detailed summary: `None`
 
 ## Next recommended action
-`sdd-archive`, luego abrir PR de la rama `feat/hooks-go-migration`.
+Start a new session when more work is needed.
