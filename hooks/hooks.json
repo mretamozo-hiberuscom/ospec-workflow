@@ -3,34 +3,34 @@
     "SessionStart": [
       {
         "type": "command",
-        "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-start.js\""
+        "command": "${CLAUDE_PLUGIN_ROOT}/scripts/hooks/ospec-hooks session-start"
       }
     ],
     "PreToolUse": [
       {
         "type": "command",
-        "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/pre-tool-use.js\"",
+        "command": "${CLAUDE_PLUGIN_ROOT}/scripts/hooks/ospec-hooks pre-tool-use",
         "timeout": 5
       }
     ],
     "PreCompact": [
       {
         "type": "command",
-        "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/pre-compact.js\"",
+        "command": "${CLAUDE_PLUGIN_ROOT}/scripts/hooks/ospec-hooks pre-compact",
         "timeout": 5
       }
     ],
     "SubagentStop": [
       {
         "type": "command",
-        "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/subagent-stop.js\"",
+        "command": "${CLAUDE_PLUGIN_ROOT}/scripts/hooks/ospec-hooks subagent-stop",
         "timeout": 5
       }
     ],
     "Stop": [
       {
         "type": "command",
-        "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/stop.js\"",
+        "command": "${CLAUDE_PLUGIN_ROOT}/scripts/hooks/ospec-hooks stop",
         "timeout": 5
       }
     ]

@@ -22,6 +22,54 @@ const { runConfigure } = require("./cli.js");
 
 const TARGETS = new Set(["opencode", "github-copilot"]);
 
+// Detect the host platform suffix used in CI-compiled binary names.
+function hostBinarySuffix() {
+  const p = process.platform;
+  const a = process.arch;
+  const os2 = p === "win32" ? "windows" : p === "darwin" ? "darwin" : "linux";
+  const arch = a === "x64" ? "amd64" : a === "arm64" ? "arm64" : a;
+  const ext = p === "win32" ? ".exe" : "";
+  return { os: os2, arch, ext };
+}
+
+// Copy the platform-appropriate ospec-hooks binary into the generated output
+// tree. For claude/vscode/github-copilot the binary lands in scripts/hooks/;
+// for opencode it lands in release/dist/ (where the plugin's resolveBinary()
+// looks first). If the source binary is absent (pre-CI dev environment),
+// print a warning and skip without failing.
+function copyBinaryToTree(outDir, target, sourceDir) {
+  const { os: goos, arch, ext } = hostBinarySuffix();
+  const srcBin = path.join(sourceDir, "release", "dist", `ospec-hooks-${goos}-${arch}${ext}`);
+
+  if (!fs.existsSync(srcBin)) {
+    process.stderr.write(
+      `[warn] ospec-hooks binary not found at ${srcBin}; skipping copy.\n` +
+        `       Run the CI build (build-hooks.yml) or 'go build -o release/dist/ospec-hooks-${goos}-${arch}${ext} ./cmd/ospec-hooks' first.\n`,
+    );
+    return;
+  }
+
+  // Destination paths differ per target:
+  //   opencode   -> release/dist/ospec-hooks[.exe]  (plugin resolveBinary priority 1)
+  //   everything -> scripts/hooks/ospec-hooks[.exe]  (CLAUDE_PLUGIN_ROOT-relative shell hook)
+  const destinations = [];
+  if (target === "opencode") {
+    destinations.push(path.join(outDir, "release", "dist", `ospec-hooks${ext}`));
+  } else {
+    destinations.push(path.join(outDir, "scripts", "hooks", `ospec-hooks${ext}`));
+  }
+
+  for (const dest of destinations) {
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(srcBin, dest);
+    // Set executable bit on POSIX systems so the shell can invoke the binary.
+    if (process.platform !== "win32") {
+      fs.chmodSync(dest, 0o755);
+    }
+    process.stdout.write(`  + ospec-hooks${ext} -> ${path.relative(outDir, dest)}\n`);
+  }
+}
+
 function parseArgs(argv) {
   const args = { dryRun: false, validate: true };
   const positional = [];
@@ -86,6 +134,11 @@ function main(argv) {
     return;
   }
 
+  // Copy the platform binary into the generated tree before syncing. This is
+  // best-effort: if the binary is absent (pre-CI dev), a warning is printed and
+  // the rest of the sync proceeds normally.
+  copyBinaryToTree(outDir, args.target, sourceDir);
+
   // Copy each top-level generated entry (including dotfiles) into the dest root,
   // overwriting same-path files. force:true replaces; recursive walks dirs.
   const entries = fs.readdirSync(outDir);
@@ -115,4 +168,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { main, assertSafeDest, parseArgs };
+module.exports = { main, assertSafeDest, parseArgs, copyBinaryToTree };

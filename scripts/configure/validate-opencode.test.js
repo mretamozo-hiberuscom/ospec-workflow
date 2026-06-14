@@ -98,16 +98,19 @@ test("validate rejects opencode.json without a $schema", (t) => {
   assert.ok(validate(out).errors.some((error) => error.includes("must include a $schema")));
 });
 
-test("validate fails when the plugin bridges a script that is not shipped", (t) => {
+test("validate fails when the plugin is missing spawnSync invocation", (t) => {
   const out = tmpOut(t);
   runConfigure({ sourceDir: SOURCE, target: "opencode", outDir: out, validate: false });
   assert.equal(validate(out).errors.length, 0);
 
-  fs.rmSync(path.join(out, "scripts/hooks/pre-tool-use.js"), { force: true });
+  // Replace the plugin with a stub that lacks spawnSync — the new validator
+  // checks for the binary invocation contract, not the old require() script references.
+  fs.writeFileSync(path.join(out, ".opencode/plugins/ospec.js"), "// empty plugin stub\n");
 
   const result = validate(out);
 
-  assert.ok(result.errors.some((error) => error.includes("references missing script: scripts/hooks/pre-tool-use.js")));
+  assert.ok(result.errors.some((error) => error.includes("must use spawnSync")));
+  assert.ok(result.errors.some((error) => error.includes("must reference the ospec-hooks binary")));
 });
 
 test("validate requires the skills tree so agent skill references resolve", (t) => {

@@ -496,8 +496,11 @@ test("opencode emits the plugin shim and drops the shell hooks.json", () => {
   const out = transform({ files: makeSource(), profile: opencode, models: MODELS });
   const plugin = find(out, ".opencode/plugins/ospec.js");
   assert.ok(plugin, "plugin shim emitted");
-  assert.match(plugin.content, /scripts\/hooks\/pre-tool-use\.js/);
-  assert.match(plugin.content, /scripts\/hooks\/session-start\.js/);
+  // The plugin now calls the Go binary via spawnSync — not require() of JS hook files.
+  assert.match(plugin.content, /spawnSync/, "plugin must use spawnSync");
+  assert.match(plugin.content, /ospec-hooks/, "plugin must reference the binary");
+  assert.match(plugin.content, /pre-tool-use/, "plugin must bridge pre-tool-use subcommand");
+  assert.match(plugin.content, /session-start/, "plugin must bridge session-start subcommand");
   assert.equal(find(out, "hooks/hooks.json"), undefined, "shell hooks.json dropped");
 });
 

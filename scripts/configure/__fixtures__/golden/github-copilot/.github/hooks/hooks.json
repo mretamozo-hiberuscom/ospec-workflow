@@ -4,15 +4,15 @@
     "sessionStart": [
       {
         "type": "command",
-        "bash": "node \"scripts/hooks/session-start.js\"",
-        "powershell": "node \"scripts/hooks/session-start.js\""
+        "bash": "scripts/hooks/ospec-hooks session-start",
+        "powershell": "scripts/hooks/ospec-hooks session-start"
       }
     ],
     "preToolUse": [
       {
         "type": "command",
-        "bash": "node \"scripts/hooks/pre-tool-use.js\"",
-        "powershell": "node \"scripts/hooks/pre-tool-use.js\"",
+        "bash": "scripts/hooks/ospec-hooks pre-tool-use",
+        "powershell": "scripts/hooks/ospec-hooks pre-tool-use",
         "timeoutSec": 5
       }
     ]
