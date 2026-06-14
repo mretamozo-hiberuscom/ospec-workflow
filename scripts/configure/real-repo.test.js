@@ -78,14 +78,19 @@ test("real repo: opencode ships every source skill file the agents read by path"
   }
 });
 
-test("real repo: opencode plugin bridges to scripts that ship in the tree", (t) => {
+test("real repo: opencode plugin bridges ospec-hooks binary with correct subcommands", (t) => {
   const out = tmpOut(t);
   runConfigure({ sourceDir: ROOT, target: "opencode", outDir: out, validate: false });
 
   const plugin = fs.readFileSync(path.join(out, ".opencode", "plugins", "ospec.js"), "utf8");
+  // The plugin now calls the Go binary via spawnSync — not require() of JS files.
+  assert.match(plugin, /spawnSync/, "plugin must use spawnSync to invoke the binary");
+  assert.match(plugin, /ospec-hooks/, "plugin must reference the ospec-hooks binary");
+  assert.match(plugin, /pre-tool-use/, "plugin must bridge the pre-tool-use subcommand");
+  assert.match(plugin, /session-start/, "plugin must bridge the session-start subcommand");
+  // JS hook scripts still ship in the tree (fallback). Verify they are present.
   for (const rel of ["scripts/hooks/pre-tool-use.js", "scripts/hooks/session-start.js"]) {
-    assert.match(plugin, new RegExp(rel.replace(/\//g, "\\/")), `plugin must bridge ${rel}`);
-    assert.ok(fs.existsSync(path.join(out, rel)), `bridged script not shipped: ${rel}`);
+    assert.ok(fs.existsSync(path.join(out, rel)), `fallback script not shipped: ${rel}`);
   }
 });
 

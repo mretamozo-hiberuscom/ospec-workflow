@@ -1,0 +1,5 @@
+{
+  "description": "DENY: rm -rf / matches the rm DENY rule (recursive forced deletion of filesystem root)",
+  "stdin": "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rm -rf /\"}}",
+  "expectedStdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Recursive forced deletion of the filesystem root is blocked.\"}}"
+}

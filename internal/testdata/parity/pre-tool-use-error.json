@@ -1,0 +1,5 @@
+{
+  "description": "ERROR: malformed JSON stdin triggers fail-open ask decision",
+  "stdin": "{bad json",
+  "expectedStdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"The safety hook could not inspect this tool call: invalid character 'b' looking for beginning of object key string\"}}"
+}

@@ -1,0 +1,137 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Node.js 22+, CommonJS JavaScript (no TypeScript, no external runtime frameworks)
+  Architecture: Multi-target plugin/workflow generator producing four targets: claude, vscode, github-copilot, opencode
+  Key dirs: scripts/ (build+test+hook logic), skills/ (SDD+utility skills), agents/ (phase prompt templates), hooks/, dist/ (generated output), rules/, commands/, profiles/
+  Testing: Node.js native test runner (--test flag), 20 unit/integration test files in scripts/**/*.test.js
+  Package manager: npm (no lock file; package.json at root, Node >=22 required)
+  Style: Conventional Commits with Spanish imperative subject/body; no AI/model attribution in commits or PRs
+  Hooks: SessionStart, PreToolUse, PreCompact, SubagentStop, Stop (configured in hooks/hooks.json)
+
+project:
+  name: ospec-workflow
+  version: 2.3.0
+  status: active
+
+artifact_store:
+  mode: openspec
+  backend: openspec
+
+strict_tdd: true
+
+testing:
+  runner: node
+  test_command: "npm test"
+  raw_command: "node --test scripts/**/*.test.js"
+  framework: "Node.js native test runner (--test flag)"
+  layers:
+    unit: true
+    integration: true
+    e2e: false
+  coverage:
+    available: false
+    command: null
+  quality:
+    linter: false
+    type_checker: false
+    formatter: false
+
+baseline:
+  status: done
+  domains_pending: []
+  domains_done:
+    - generator
+    - routing
+    - hooks
+    - skills
+    - agents
+    - skill-registry
+    - install
+  stale_domains: []
+  last_checked: "2026-06-14T19:00:00Z"
+
+rules:
+  foundation:
+    - Ask one blocking question at a time
+    - Do not generate application code before scaffold/project setup is approved
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    guidelines:
+      - Follow existing code patterns
+    tdd: true
+    test_command: "npm test"
+  verify:
+    test_command: "npm test"
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
+
+routing:
+  - name: foundation
+    classification: [normal, high-risk]
+    conditions:
+      project.status: empty
+    phases: [sdd-foundation]
+    gates: []
+    description: "Guided pre-SDD foundation phase for empty projects."
+    cost: medium
+
+  - name: federated
+    classification: [normal, high-risk]
+    conditions:
+      artifact_store.backend: workspace-federated
+    phases: [sdd-workspace, sdd-propose, sdd-spec, sdd-design, sdd-tasks, sdd-apply, sdd-verify, sdd-archive]
+    gates: [impact, clarify]
+    description: "Full SDD for federated multi-repo workspaces."
+    cost: high
+
+  - name: debug
+    classification: [small, normal]
+    conditions:
+      explicit_debug_intent: "true"
+    phases: [sdd-explore, sdd-apply]
+    gates: [4r-review-gate]
+    description: "Lightweight locate-fix flow closing with 4R review gate."
+    cost: low
+
+  - name: brownfield
+    classification: [normal, high-risk]
+    conditions:
+      match: any
+      baseline.status: [pending, partial]
+      specs_empty_with_code: true
+      code_without_specs: true
+    phases: [sdd-baseline]
+    gates: [brownfield-advisory]
+    description: "Advisory-first baseline pass for brownfield repos."
+    cost: medium
+
+  - name: standard
+    classification: [normal, high-risk]
+    conditions:
+      project.status: active
+    phases: [sdd-propose, sdd-spec, sdd-design, sdd-tasks, sdd-apply, sdd-verify, sdd-archive]
+    gates: [clarify, 4r-review-gate]
+    description: "Full SDD for normal/high-risk changes on active projects."
+    cost: high
+
+  - name: lite
+    classification: [trivial, small]
+    conditions:
+      change.classification: small
+    phases: [sdd-propose, sdd-tasks, sdd-apply, sdd-verify]
+    gates: []
+    description: "Reduced SDD for trivial/small changes."
+    cost: low

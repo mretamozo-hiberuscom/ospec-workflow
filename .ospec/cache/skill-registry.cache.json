@@ -1,0 +1,464 @@
+{
+  "version": 2,
+  "fingerprint": "sha256:597df99e6f3841970793df1e8787e6a82c75f693dfedf6deae1e45bc938f9999",
+  "generated_at": "2026-06-14T11:11:41.305Z",
+  "skills": [
+    {
+      "id": "agent-introspection",
+      "path": "skills/agent-introspection/SKILL.md",
+      "triggers": [
+        "an agent loops",
+        "drifts",
+        "loses context",
+        "repeatedly fails",
+        "or burns tokens without progress."
+      ],
+      "compact_rules": [
+        "repeated reading of the same files;",
+        "ignored OpenSpec state;",
+        "missing skill_resolution;",
+        "phase agent asks user directly;",
+        "apply modifies files outside assigned tasks;",
+        "verify starts fixing code;",
+        "orchestrator executes multi-file work inline.",
+        "Stop current action.",
+        "Read `openspec/changes/{change}/state.yaml`.",
+        "Read latest `.ospec/session/**/session-summary.md` if available.",
+        "Check `.ospec/cache/skill-registry.cache.json`.",
+        "Reconstruct next safe phase.",
+        "Continue only with explicit phase contract."
+      ]
+    },
+    {
+      "id": "branch-pr",
+      "path": "skills/branch-pr/SKILL.md",
+      "triggers": [
+        "creating",
+        "opening",
+        "or preparing PRs for review."
+      ],
+      "compact_rules": [
+        "**Every PR MUST link an approved issue** — no exceptions",
+        "**Every PR MUST have exactly one `type:*` label**",
+        "**Automated checks must pass** before merge is possible",
+        "**Blank PRs without issue linkage will be blocked** by GitHub Actions",
+        "**No model/tool attribution** in the PR title, body, or comments — never include"
+      ]
+    },
+    {
+      "id": "caveman",
+      "path": "skills/caveman/SKILL.md",
+      "triggers": [
+        "caveman mode",
+        "talk like caveman",
+        "use caveman",
+        "less tokens",
+        "be brief",
+        "/caveman. Compress replies without losing technical accuracy."
+      ],
+      "compact_rules": [
+        "Preserve technical accuracy, exact symbols, exact error text, code blocks, commands, file paths, and inline code.",
+        "Remove filler, pleasantries, hedging, redundant phrasing, and long setup.",
+        "Use short fragments when clear. Prefer pattern: `Thing. Cause. Fix.`",
+        "Keep the user's current language.",
+        "Do not caveman-compress code, commit messages, PR text, specs, or persisted artifacts unless the user explicitly asks.",
+        "Drop caveman style for security warnings, irreversible actions, or ambiguous multi-step instructions; resume after the risky part is clear.",
+        "Level: Apply",
+        "`lite`: No filler/hedging. Keep articles + full sentences. Professional but tight",
+        "`full`: Fragments allowed, articles dropped when clear. Classic caveman",
+        "`ultra`: Maximum brevity, abbreviations allowed when unambiguous.",
+        "`wenyan-lite`: Light classical Chinese compression.",
+        "`wenyan`: Full classical Chinese compression. Classical sentence patterns, verbs precede objects, subjects often omitted, classical particles (之/乃/為/其)",
+        "`wenyan-ultra`: Extreme abbreviation while keeping classical Chinese feel. Maximum compression, ultra terse"
+      ]
+    },
+    {
+      "id": "caveman-commit",
+      "path": "skills/caveman-commit/SKILL.md",
+      "triggers": [
+        "write a commit",
+        "commit message",
+        "generate commit",
+        "/commit",
+        "/caveman-commit. Generate terse Conventional Commits messages."
+      ],
+      "compact_rules": [
+        "Use Conventional Commits: `<type>(<scope>): <imperative Spanish summary>`.",
+        "Prefer subject length <=50 chars; hard cap 72 chars.",
+        "Write the summary in Spanish imperative: `añade`, `corrige`, `elimina`; never participles like `añadido`, gerunds like `añadiendo`, or infinitives like `añadir`.",
+        "Do not add `Co-Authored-By`, AI attribution, emojis, \"I\", \"we\", or \"this commit\". NEVER name any model or tool (Claude, Claude Code, Anthropic, GPT, OpenAI, Codex, Copilot, Gemini, etc.) as author or generator. See `rules/no-model-attribution.instructions.md`.",
+        "Add a Spanish body only for non-obvious why, breaking changes, migrations, security fixes, reverts, or linked issues.",
+        "Wrap body at 72 chars. Use `BREAKING CHANGE:` for breaking changes.",
+        "Do not stage, commit, amend, or modify files.",
+        "Change: Commit shape",
+        "Obvious small change: Subject only.",
+        "Non-obvious why: Subject plus short body.",
+        "Breaking change: `!` in subject plus `BREAKING CHANGE:` body.",
+        "Security, migration, revert: Body required."
+      ]
+    },
+    {
+      "id": "caveman-compress",
+      "path": "skills/caveman-compress/SKILL.md",
+      "triggers": [
+        "/caveman:compress <filepath>",
+        "compress memory file. Compress prose files while preserving technical content and backups."
+      ],
+      "compact_rules": [
+        "Compress only prose files: `.md`, `.txt`, or extensionless memory files.",
+        "Never compress source, config, lock, env, SQL, shell, HTML, XML, JSON, YAML, TOML, CSS, or generated files.",
+        "Preserve exactly: fenced code blocks, inline code, URLs, markdown links, file paths, commands, technical names, proper nouns, dates, versions, numbers, and frontmatter.",
+        "Preserve markdown heading text, list nesting, table structure, and numbering.",
+        "Back up the original beside the file as `<filename>.original.md` before overwriting.",
+        "Never compress an `.original.md` backup.",
+        "If unsure whether text is code or prose, leave it unchanged.",
+        "Condition: Action",
+        "Supported prose file: Compress prose outside protected regions.",
+        "Unsupported file type: Stop and report unsupported file.",
+        "Existing `.original.md` target: Stop unless user explicitly confirms overwrite.",
+        "Validation fails: Report failure; leave original untouched."
+      ]
+    },
+    {
+      "id": "caveman-help",
+      "path": "skills/caveman-help/SKILL.md",
+      "triggers": [
+        "/caveman-help",
+        "caveman help",
+        "what caveman commands",
+        "how do I use caveman. Show one-shot caveman command help."
+      ],
+      "compact_rules": [
+        "Keep the help compact and scannable.",
+        "Do not write files, flags, config, or persistent state.",
+        "Do not load compression scripts.",
+        "Use caveman style for the help output, but keep commands exact.",
+        "User asks: Show",
+        "General help: Modes, task skills, deactivate command.",
+        "Specific mode: Only that mode plus activation command.",
+        "Config/defaults: Default mode and precedence if known."
+      ]
+    },
+    {
+      "id": "caveman-review",
+      "path": "skills/caveman-review/SKILL.md",
+      "triggers": [
+        "review this PR",
+        "code review",
+        "review the diff",
+        "/review",
+        "/caveman-review. Write terse actionable review comments."
+      ],
+      "compact_rules": [
+        "Lead with findings, ordered by severity.",
+        "Use exact file paths, line numbers, symbols, and concrete fixes.",
+        "Keep each inline finding one line when the issue is simple.",
+        "Do not praise, restate the diff, hedge, or write \"consider\" when the fix is required.",
+        "Use `q:` only for genuine uncertainty; otherwise state the defect.",
+        "Do not write code fixes, approve, request changes, stage files, or run linters unless separately asked.",
+        "Use normal prose for security findings, architectural disputes, or onboarding explanations where the why matters.",
+        "Finding: Prefix",
+        "Broken behavior: `bug:`",
+        "Fragile or risky behavior: `risk:`",
+        "Optional cleanup: `nit:`",
+        "Real question: `q:`"
+      ]
+    },
+    {
+      "id": "chained-pr",
+      "path": "skills/chained-pr/SKILL.md",
+      "triggers": [
+        "PRs over 400 lines",
+        "stacked PRs",
+        "review slices. Split oversized changes into chained PRs that protect review focus."
+      ],
+      "compact_rules": [
+        "Split PRs over **400 changed lines** unless a maintainer explicitly accepts `size:exception`.",
+        "Keep each PR reviewable in about **≤60 minutes**.",
+        "Use one deliverable work unit per PR; keep tests/docs with the unit they verify.",
+        "State start, end, prior dependencies, follow-up work, and out-of-scope items in every chained PR.",
+        "Every child PR must include a dependency diagram marking the current PR with `📍`.",
+        "In Feature Branch Chain, create a draft/no-merge tracker PR; child PR #1 targets the tracker branch, later children target the immediate parent branch.",
+        "Treat polluted diffs as base bugs: retarget or rebase until only the current work unit appears.",
+        "Do not mix chain strategies after the user chooses one.",
+        "Condition: Action",
+        "PR ≤400 changed lines and focused: Keep single PR.",
+        "PR >400, each slice can land independently: Use Stacked PRs to main.",
+        "PR >400, feature must integrate before main: Use Feature Branch Chain with tracker.",
+        "Generated/vendor/migration diff cannot split cleanly: Ask maintainer for `size:exception`.",
+        "SDD provides `delivery_strategy`: Follow it before apply/PR creation."
+      ]
+    },
+    {
+      "id": "cognitive-doc-design",
+      "path": "skills/cognitive-doc-design/SKILL.md",
+      "triggers": [
+        "writing guides",
+        "READMEs",
+        "RFCs",
+        "onboarding",
+        "architecture",
+        "or review-facing docs."
+      ],
+      "compact_rules": [
+        "Pattern: Rule",
+        "Lead with the answer: Put the decision, action, or outcome first. Context comes after.",
+        "Progressive disclosure: Start with the happy path, then add details, edge cases, and references.",
+        "Chunking: Group related information into small sections. Keep flat lists short.",
+        "Signposting: Use headings, labels, callouts, and summaries so readers know where they are.",
+        "Recognition over recall: Prefer tables, checklists, examples, and templates over prose that must be remembered.",
+        "Review empathy: Design docs so reviewers can verify intent without reconstructing the whole story."
+      ]
+    },
+    {
+      "id": "comment-writer",
+      "path": "skills/comment-writer/SKILL.md",
+      "triggers": [
+        "PR feedback",
+        "issue replies",
+        "reviews",
+        "Slack messages",
+        "or GitHub comments."
+      ],
+      "compact_rules": [
+        "Be useful fast: Start with the actionable point. Do not recap the whole PR before feedback.",
+        "Be warm and direct: Sound like a thoughtful teammate, not a corporate bot.",
+        "Keep it short: Prefer 1 to 3 short paragraphs or a tight bullet list.",
+        "Explain why: Give the technical reason when asking for a change.",
+        "Avoid pile-ons: Comment on the highest-value issue, not every tiny preference.",
+        "Match thread language: Write in the thread/user language. If writing in Spanish, use Madrid-Style Spanish.",
+        "No em dashes: Use commas, periods, or parentheses instead."
+      ]
+    },
+    {
+      "id": "context7-mcp",
+      "path": "skills/context7-mcp/SKILL.md",
+      "triggers": [
+        "context7-mcp"
+      ],
+      "compact_rules": [
+        "Asks setup or configuration questions (\"How do I configure Next.js middleware?\")",
+        "Requests code involving libraries (\"Write a Prisma query for...\")",
+        "Needs API references (\"What are the Supabase auth methods?\")",
+        "Mentions specific frameworks (React, Vue, Svelte, Express, Tailwind, etc.)",
+        "`libraryName`: The library name extracted from the user's question",
+        "`query`: The user's full question (improves relevance ranking)",
+        "Exact or closest name match to what the user asked for",
+        "Higher benchmark scores indicate better documentation quality",
+        "If the user mentioned a version (e.g., \"React 19\"), prefer version-specific IDs",
+        "`libraryId`: The selected Context7 library ID (e.g., `/vercel/next.js`)",
+        "`query`: The user's specific question",
+        "Answer the user's question using current, accurate information",
+        "Include relevant code examples from the docs",
+        "Cite the library version when relevant",
+        "**Be specific**: Pass the user's full question as the query for better results"
+      ]
+    },
+    {
+      "id": "go-testing",
+      "path": "skills/go-testing/SKILL.md",
+      "triggers": [
+        "Go tests",
+        "go test coverage",
+        "Bubbletea teatest",
+        "golden files. Apply focused Go testing patterns."
+      ],
+      "compact_rules": [
+        "Prefer table-driven tests for multiple cases; use `t.Run(tt.name, ...)`.",
+        "Test behavior and state transitions, not implementation trivia.",
+        "Use `t.TempDir()` for filesystem tests; never rely on a real home directory.",
+        "Keep integration tests skippable with `testing.Short()` when they run external commands or slow flows.",
+        "For Bubbletea, test `Model.Update()` directly for state changes; use `teatest` only for interactive flows.",
+        "Golden files must be deterministic; update only through the repo's `-update` path and rerun tests without `-update`.",
+        "Use small mocks/interfaces around system or command execution boundaries.",
+        "Target: Test pattern",
+        "Pure function or parser: Table-driven unit test.",
+        "Error behavior: Explicit success and failure cases.",
+        "File operations: `t.TempDir()` plus focused assertions.",
+        "TUI state transition: Direct `Model.Update()` call with `tea.Msg`.",
+        "Full TUI interaction: `teatest.NewTestModel()`.",
+        "Rendered output: Golden file test.",
+        "Real external command: Integration test; skip in `-short`."
+      ]
+    },
+    {
+      "id": "harness-audit",
+      "path": "skills/harness-audit/SKILL.md",
+      "triggers": [
+        "auditing the plugin manifest",
+        "agent boundaries",
+        "hooks",
+        "skills",
+        "or token efficiency."
+      ],
+      "compact_rules": [
+        "Plugin manifest",
+        "- `plugin.json` exists.",
+        "- hooks are declared.",
+        "- agents/commands/skills/rules paths resolve.",
+        "Agent boundaries",
+        "- orchestrator coordinates only.",
+        "- phase agents execute only.",
+        "- no recursive delegation from phase agents.",
+        "Skill registry",
+        "- cache exists.",
+        "- fingerprint is fresh.",
+        "- compact rules are available.",
+        "Token discipline",
+        "- prompts pass paths, not full artifacts.",
+        "- compact rules are injected."
+      ]
+    },
+    {
+      "id": "issue-creation",
+      "path": "skills/issue-creation/SKILL.md",
+      "triggers": [
+        "creating GitHub issues",
+        "bug reports",
+        "or feature requests."
+      ],
+      "compact_rules": [
+        "**Blank issues are disabled** — MUST use a template (bug report or feature request)",
+        "**Every issue gets `status:needs-review` automatically** on creation",
+        "**A maintainer MUST add `status:approved`** before any PR can be opened",
+        "**Questions go to [Discussions](https://github.com/manuel-retamozo-garcia/agent-teams-lite/discussions)**, not issues"
+      ]
+    },
+    {
+      "id": "judgment-day",
+      "path": "skills/judgment-day/SKILL.md",
+      "triggers": [
+        "judgment day",
+        "dual review",
+        "adversarial review",
+        "juzgar. Run blind dual review",
+        "fix confirmed issues",
+        "then re-judge."
+      ],
+      "compact_rules": [
+        "Resolve project skills before launching agents: read skill registry, match compact rules by target files/task, and inject the same `Project Standards` block into both judge prompts and fix prompts.",
+        "Launch **two blind judges in parallel** with identical target and criteria; never review the code yourself.",
+        "Wait for both judges before synthesis; never accept a partial verdict.",
+        "Classify warnings as `WARNING (real)` only if normal intended use can trigger them; otherwise downgrade to INFO as `WARNING (theoretical)`.",
+        "Ask before fixing Round 1 confirmed issues.",
+        "After any fix agent runs, immediately re-launch both judges in parallel before commit/push/done/session summary.",
+        "Terminal states are only `JUDGMENT: APPROVED` or `JUDGMENT: ESCALATED`.",
+        "After 2 fix iterations with remaining issues, ask the user whether to continue.",
+        "Condition: Action",
+        "Target unclear: Ask for scope; do not launch judges.",
+        "No skill registry: Warn, proceed with generic criteria, and record `Skill Resolution: none`.",
+        "Both judges find same CRITICAL/real WARNING: Confirmed; ask/fix according to round rules.",
+        "One judge finds issue: Suspect; report and triage, do not auto-fix.",
+        "Judges contradict: Escalate for manual decision.",
+        "Round 2+ has only theoretical warnings/suggestions: Report as INFO; do not re-judge."
+      ]
+    },
+    {
+      "id": "review-readability",
+      "path": "skills/review-readability/SKILL.md",
+      "triggers": [
+        "review-readability"
+      ],
+      "compact_rules": [
+        "NEVER write, edit, or delete any file",
+        "NEVER emit a finding without a concrete file + line or function name reference",
+        "NEVER flag idiomatic patterns or standard library usage with clear intent",
+        "ALWAYS use exactly one severity label per finding",
+        "ALWAYS emit `No findings.` (exactly) when the scope is clean",
+        "Return envelope per **Section D** from `skills/_shared/sdd-phase-common.md`"
+      ]
+    },
+    {
+      "id": "review-reliability",
+      "path": "skills/review-reliability/SKILL.md",
+      "triggers": [
+        "review-reliability"
+      ],
+      "compact_rules": [
+        "NEVER write, edit, or delete any file",
+        "NEVER emit a finding without a concrete code path or missing test name",
+        "NEVER flag intentionally untested scaffolding that is explicitly marked as TODO or placeholder",
+        "ALWAYS use exactly one severity label per finding",
+        "ALWAYS emit `No findings.` (exactly) when the scope is clean",
+        "Return envelope per **Section D** from `skills/_shared/sdd-phase-common.md`"
+      ]
+    },
+    {
+      "id": "review-resilience",
+      "path": "skills/review-resilience/SKILL.md",
+      "triggers": [
+        "review-resilience"
+      ],
+      "compact_rules": [
+        "NEVER write, edit, or delete any file",
+        "NEVER emit a finding without a concrete file + line reference for the unhandled path",
+        "NEVER flag documented fail-fast patterns with an explanatory reason comment or spec reference",
+        "ALWAYS use exactly one severity label per finding",
+        "ALWAYS emit `No findings.` (exactly) when the scope is clean",
+        "Return envelope per **Section D** from `skills/_shared/sdd-phase-common.md`"
+      ]
+    },
+    {
+      "id": "review-risk",
+      "path": "skills/review-risk/SKILL.md",
+      "triggers": [
+        "review-risk"
+      ],
+      "compact_rules": [
+        "NEVER write, edit, or delete any file",
+        "NEVER emit a finding without concrete evidence",
+        "NEVER emit vague findings like \"this looks risky\" — name the specific vector",
+        "ALWAYS use exactly one severity label per finding",
+        "ALWAYS emit `No findings.` (exactly) when the scope is clean",
+        "Return envelope per **Section D** from `skills/_shared/sdd-phase-common.md`"
+      ]
+    },
+    {
+      "id": "skill-creator",
+      "path": "skills/skill-creator/SKILL.md",
+      "triggers": [
+        "new skills",
+        "agent instructions",
+        "documenting AI usage patterns. Create LLM-first skills with valid frontmatter."
+      ],
+      "compact_rules": [
+        "When working in this repo, first follow `references/skill-style-guide.md` as the normative source before creating or updating skills.",
+        "If that guide is unavailable, use the compact inline rules below.",
+        "A skill is a runtime instruction contract for an LLM, not human documentation.",
+        "Do not add a `Keywords` section; preserve essential trigger words in `description`.",
+        "References must point to local files.",
+        "Keep the skill body concise: target 180–450 tokens, recommended max 700, hard max 1000.",
+        "Need: Action",
+        "Code templates, schemas, fixtures, generated examples: Put them in `assets/`",
+        "Conceptual detail, edge cases, existing docs: Put local links in `references/`",
+        "Long explanation in `SKILL.md`: Move it to a supporting file",
+        "Multiple meaningful paths: Add a compact decision table",
+        "`description` MUST be one physical line, quoted, YAML-safe, and include essential trigger words first.",
+        "`description` SHOULD be <=160 chars and MUST be <=250 chars.",
+        "Frontmatter MUST include `name`, `description`, `license`, `metadata.author`, and `metadata.version`.",
+        "Use imperative instructions, not tutorials or background prose."
+      ]
+    },
+    {
+      "id": "work-unit-commits",
+      "path": "skills/work-unit-commits/SKILL.md",
+      "triggers": [
+        "implementation",
+        "commit splitting",
+        "chained PRs",
+        "or keeping tests and docs with code."
+      ],
+      "compact_rules": [
+        "Commit by work unit: A commit represents a deliverable behavior, fix, migration, or docs unit.",
+        "Do not commit by file type: Avoid `models`, then `services`, then `tests` if none works alone.",
+        "Keep tests with code: Tests belong in the same commit as the behavior they verify.",
+        "Keep docs with the user-visible change: Docs belong with the feature or workflow they explain.",
+        "Tell a story: A reviewer should understand why each commit exists from its diff and message.",
+        "Future PR-ready: Each commit should be a candidate chained PR when the change grows.",
+        "Spanish imperative message: Keep the Conventional Commit type in English, but write the subject and body in Spanish imperative prose.",
+        "No model attribution: Never add `Co-Authored-By`, a 🤖 footer, or any model/tool name (Claude, GPT, Gemini, Copilot, etc.) to a commit or PR. See `rules/no-model-attribution.instructions.md`.",
+        "SDD workload guard: If SDD tasks forecast a >400-line change, group commits into chained PR slices before implementation."
+      ]
+    }
+  ]
+}

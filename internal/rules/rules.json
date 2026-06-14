@@ -1,0 +1,110 @@
+[
+  {
+    "action": "deny",
+    "flags": "i",
+    "pattern": "\\brm\\b(?=[^\\r\\n;&|]*\\s-(?:[a-z]*r[a-z]*f|[a-z]*f[a-z]*r)\\b)[^\\r\\n;&|]*(?:\\s/(?:\\s|$)|--no-preserve-root\\b)",
+    "reason": "Recursive forced deletion of the filesystem root is blocked."
+  },
+  {
+    "action": "deny",
+    "flags": "i",
+    "pattern": "\\bgit\\s+push\\b[^\\r\\n;&|]*(?:--force(?:=|\\s|$)|\\s-f(?:\\s|$))",
+    "reason": "Force-pushing Git history is blocked."
+  },
+  {
+    "action": "deny",
+    "flags": "i",
+    "pattern": "\\b(?:curl|wget)\\b[^\\r\\n]*(?:\\||\\|&)\\s*(?:sudo\\s+)?(?:sh|bash|zsh|dash|ksh)\\b",
+    "reason": "Piping downloaded content directly into a shell is blocked."
+  },
+  {
+    "action": "deny",
+    "flags": "i",
+    "pattern": "\\b(?:iwr|irm|invoke-webrequest|invoke-restmethod)\\b[^\\r\\n]*\\|\\s*(?:iex|invoke-expression)\\b",
+    "reason": "Piping downloaded content into PowerShell evaluation is blocked."
+  },
+  {
+    "action": "deny",
+    "flags": "i",
+    "pattern": "\\bremove-item\\b[^\\r\\n;&|]*(?=[^\\r\\n;&|]*\\s-(?:recurse|r)\\b)(?=[^\\r\\n;&|]*\\s-(?:force|fo)\\b)[^\\r\\n;&|]*(?:[a-z]:\\\\(?:\\s|$)|[a-z]:/(?:\\s|$))",
+    "reason": "Recursive forced deletion of a drive root is blocked."
+  },
+  {
+    "action": "deny",
+    "flags": "i",
+    "pattern": "\\bmkfs(?:\\.[a-z0-9_-]+)?\\b",
+    "reason": "Formatting a filesystem is blocked."
+  },
+  {
+    "action": "deny",
+    "flags": "i",
+    "pattern": "\\bdd\\b[^\\r\\n;&|]*\\bof\\s*=\\s*/dev/(?:sd[a-z]|nvme\\d+n\\d+|vd[a-z]|xvd[a-z]|disk\\d+)\\b",
+    "reason": "Writing raw data directly to a storage device is blocked."
+  },
+  {
+    "action": "deny",
+    "flags": "i",
+    "pattern": "\\b(?:format(?:\\.com)?|clear-disk)\\b[^\\r\\n;&|]*(?:[a-z]:|-\\s*number\\b)",
+    "reason": "Formatting or clearing a disk is blocked."
+  },
+  {
+    "action": "ask",
+    "flags": "i",
+    "pattern": "\\b(?:npm|pnpm|yarn|bun)\\s+(?:install|add|i|ci)\\b",
+    "reason": "Dependency installation requires user approval."
+  },
+  {
+    "action": "ask",
+    "flags": "i",
+    "pattern": "\\bgit\\s+reset\\b[^\\r\\n;&|]*--hard\\b",
+    "reason": "A hard Git reset can discard local changes."
+  },
+  {
+    "action": "ask",
+    "flags": "i",
+    "pattern": "\\bgit\\s+clean\\b[^\\r\\n;&|]*\\s-[a-z]*f[a-z]*\\b",
+    "reason": "Git clean can permanently remove untracked files."
+  },
+  {
+    "action": "ask",
+    "flags": "i",
+    "pattern": "\\bdocker(?:\\s+compose|-compose)\\s+down\\b",
+    "reason": "Stopping and removing Docker Compose resources requires approval."
+  },
+  {
+    "action": "ask",
+    "flags": "i",
+    "pattern": "\\brm\\b(?=[^\\r\\n;&|]*\\s-(?:[a-z]*r[a-z]*f|[a-z]*f[a-z]*r)\\b)",
+    "reason": "Recursive forced deletion requires user approval."
+  },
+  {
+    "action": "ask",
+    "flags": "i",
+    "pattern": "\\b(?:chmod|chown)\\b[^\\r\\n;&|]*(?:\\s-[a-z]*R[a-z]*\\b|\\s--recursive\\b)",
+    "reason": "Recursive permission or ownership changes require approval."
+  },
+  {
+    "action": "ask",
+    "flags": "i",
+    "pattern": "\\bremove-item\\b[^\\r\\n;&|]*(?=[^\\r\\n;&|]*\\s-(?:recurse|r)\\b)(?=[^\\r\\n;&|]*\\s-(?:force|fo)\\b)",
+    "reason": "Recursive forced deletion requires user approval."
+  },
+  {
+    "action": "ask",
+    "flags": "i",
+    "pattern": "\\b(?:rmdir|rd)\\b[^\\r\\n;&|]*\\s/s\\b",
+    "reason": "Recursive directory deletion requires user approval."
+  },
+  {
+    "action": "ask",
+    "flags": "i",
+    "pattern": "\\bgit\\s+push\\b[^\\r\\n;&|]*--force-with-lease\\b",
+    "reason": "Force-pushing with lease still rewrites remote history."
+  },
+  {
+    "action": "ask",
+    "flags": "i",
+    "pattern": "\\b(?:shutdown|reboot|poweroff|restart-computer)\\b",
+    "reason": "Restarting or shutting down the machine requires approval."
+  }
+]

@@ -226,31 +226,29 @@ function validateConfig(root, errors) {
   }
 }
 
-// The plugin shim bridges opencode events to the runtime scripts; the scripts it
-// requires must ship in the tree, or the plugin throws at load.
+// The plugin shim bridges opencode events to the ospec-hooks Go binary via
+// spawnSync. Validate that the plugin uses spawnSync, references the binary,
+// and wires both required subcommands.
 function validatePlugin(root, errors) {
   const rel = ".opencode/plugins/ospec.js";
   if (pathType(root, rel) !== "file") {
     return;
   }
   const text = readUtf8(root, rel);
-  // Only the relative require targets (../../scripts/...) are real references;
-  // bare "scripts/..." mentions in comments are not. The leading ../ hops are
-  // stripped to a repo-relative path.
-  const scriptRe = /(?:\.\.\/)+(scripts\/[^\s"')]+\.js)/g;
-  const referenced = new Set();
-  for (const match of text.matchAll(scriptRe)) {
-    referenced.add(match[1]);
+  // Must use spawnSync to invoke the binary (not require() of hook JS files).
+  if (!text.includes("spawnSync")) {
+    addError(errors, `${rel} must use spawnSync to invoke the ospec-hooks binary`);
   }
-  for (const required of ["scripts/hooks/pre-tool-use.js", "scripts/hooks/session-start.js"]) {
-    if (!referenced.has(required)) {
-      addError(errors, `${rel} must bridge ${required}`);
-    }
+  // Must reference the binary by name.
+  if (!text.includes("ospec-hooks")) {
+    addError(errors, `${rel} must reference the ospec-hooks binary`);
   }
-  for (const ref of referenced) {
-    if (!exists(root, ref)) {
-      addError(errors, `${rel} references missing script: ${ref}`);
-    }
+  // Must wire both hooks as subcommands.
+  if (!text.includes("pre-tool-use")) {
+    addError(errors, `${rel} must bridge the pre-tool-use subcommand`);
+  }
+  if (!text.includes("session-start")) {
+    addError(errors, `${rel} must bridge the session-start subcommand`);
   }
 }
 

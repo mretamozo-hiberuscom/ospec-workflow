@@ -1,0 +1,5 @@
+{
+  "description": "ALLOW: git status matches no rule and passes the safety policy",
+  "stdin": "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git status\"}}",
+  "expectedStdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\",\"permissionDecisionReason\":\"Command payload passed the safety policy.\"}}"
+}

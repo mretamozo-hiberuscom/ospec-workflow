@@ -1,0 +1,5 @@
+{
+  "description": "ASK: npm install matches the dependency-installation ASK rule",
+  "stdin": "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"npm install\"}}",
+  "expectedStdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"Dependency installation requires user approval.\"}}"
+}

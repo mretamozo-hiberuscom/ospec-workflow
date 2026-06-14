@@ -1,0 +1,140 @@
+change: "harness-go-migration"
+status: "archived"
+classification: "normal"
+last_updated: "2026-06-14T19:57:00Z"
+
+blocking_questions: []
+
+scope:
+  phase: "phase-1-hooks-only"
+  in_scope:
+    - "5 runtime hooks → Go (pre-tool-use, session-start, pre-compact, stop, subagent-stop)"
+  out_of_scope:
+    - "Generators (route-dispatcher, skill-registry, target-transform) stay in Node.js (deferred Phase 2)"
+
+approvals:
+  - id: explore-continuation-001
+    gate: explore-continuation
+    decision: continue-to-propose-phase1-hooks-only
+    source: AskUserQuestion
+    accepted_at: "2026-06-14T19:35:00Z"
+    applies_to:
+      - sdd-propose
+  - id: opencode-coupling-O1-002
+    gate: design-input
+    decision: opencode-spawnsync-go-binary
+    source: AskUserQuestion
+    accepted_at: "2026-06-14T20:10:00Z"
+    applies_to:
+      - sdd-spec
+      - sdd-design
+  - id: clarify-decisions-003
+    gate: clarify
+    decision: all-5-recommended-defaults (build-step-ci, single-binary, go-embed, full-matrix, go-1.23)
+    source: AskUserQuestion
+    accepted_at: "2026-06-14T22:00:00Z"
+    applies_to:
+      - sdd-design
+      - sdd-tasks
+      - sdd-apply
+  - id: review-workload-004
+    gate: review-workload
+    decision: size-exception-accepted (delivery_strategy=exception-ok; ~2700 lines, High risk)
+    source: AskUserQuestion
+    accepted_at: "2026-06-14T23:30:00Z"
+    applies_to:
+      - sdd-apply
+
+route:
+  intended_route: standard
+  actual_route: standard
+  route_rationale: "project.status: active and classification in [normal, high-risk]; debug/brownfield/federated conditions not met."
+  validated: true
+  validation_errors: []
+
+phases:
+  explore:
+    status: "done"
+    artifact: "openspec/changes/harness-go-migration/exploration.md"
+  propose:
+    status: "done"
+    artifact: "openspec/changes/harness-go-migration/proposal.md"
+  spec:
+    status: "done"
+    artifacts:
+      - "openspec/changes/harness-go-migration/specs/hooks-runtime/spec.md"
+  clarify:
+    status: "done"
+    artifact: "openspec/changes/harness-go-migration/specs/hooks-runtime/spec.md"
+    questions_asked: 5
+    decisions_encoded:
+      - id: clarify-d1-binary-distribution
+        answer: "Build-step in CI; artifacts in release/dist; not committed to repo; plugin resolves from dist path or $PATH"
+      - id: clarify-d2-binary-shape
+        answer: "Single binary ospec-hooks dispatched by os.Args[1] subcommand (OCP)"
+      - id: clarify-d3-rules-location
+        answer: "Embedded at compile time with go:embed; parity with hardcoded JS rules"
+      - id: clarify-d4-platform-matrix
+        answer: "Full matrix day one: Windows amd64, macOS arm64, macOS amd64, Linux amd64"
+      - id: clarify-d5-go-version
+        answer: "Go 1.23+"
+  design:
+    status: "done"
+    artifact: "openspec/changes/harness-go-migration/design.md"
+  tasks:
+    status: "done"
+    artifact: "openspec/changes/harness-go-migration/tasks.md"
+  apply:
+    status: "done"
+    artifact: "openspec/changes/harness-go-migration/apply-progress.md"
+    batch_done: "WU-1 (Phase 1 — Foundation), WU-2 (Phase 2 — 5 Hook Handlers), WU-3 (Phases 3-6 — Plugin Wiring + CI + Integration Tests)"
+    batch_remaining: "none"
+  verify:
+    status: "done"
+    artifact: "openspec/changes/harness-go-migration/verify-report.md"
+    verdict: "PASS WITH WARNINGS"
+  archive:
+    status: "done"
+    artifact: "openspec/changes/harness-go-migration/archive-report.md"
+
+gates:
+  4r-review-gate:
+    status: done
+    on_blocker: advisory
+    findings_summary: "0 BLOCKER, 3 CRITICAL (C1/C2 parity-preserving→follow-up, C3 fixed), 2 WARNING, 1 SUGGESTION"
+    surfaced_to_user: true
+    remediation: "Fixed C3 (store.go Close error now propagated) + removed dead isShellTool cluster (pretooluse.go). C1/C2 deferred as hardening follow-ups (identical behavior exists in JS hooks today)."
+
+follow_ups:
+  - id: fu-c1-transcript-path-validation
+    severity: hardening
+    detail: "subagent-stop transcript_path read without path-traversal validation. Parity-preserving: scripts/hooks/subagent-stop.js:167 does the same. Harden both JS and Go in a separate change."
+  - id: fu-c2-cwd-path-validation
+    severity: hardening
+    detail: "precompact/stop/subagentstop resolve input.cwd without traversal guard. Parity-preserving: JS hooks do path.resolve(input.cwd) the same way. Harden JS+Go together."
+  - id: fu-w1-store-nesting
+    severity: cleanup
+    detail: "internal/store/store.go ReadBaselineState nesting depth 5 (readability WARNING)."
+  - id: fu-w2-yamllite-nesting
+    severity: cleanup
+    detail: "internal/yamllite/yamllite.go extractScalarAtPath nesting depth 4 (readability WARNING)."
+  # RESOLVED: module path github.com/mretamozo-hiberuscom/ospec-workflow MATCHES
+  # the real origin remote (github.com/mretamozo-hiberuscom/ospec-workflow.git).
+  # It was never a placeholder; no rename needed.
+
+runtime:
+  scope_decision: "phased-hooks-only-phase-1"
+  latency_win_estimate: "10x improvement for PreToolUse (0.4s → 0.03s)"
+  key_recommendations:
+    - "Migrate 5 runtime hooks (pre-tool-use, session-start, pre-compact, stop, subagent-stop) to Go"
+    - "Keep generators (route-dispatcher, skill-registry, target-transform) in Node.js"
+    - "Defer Phase 2 (generator migration) to future exploration"
+    - "Use single binary dispatched by subcommand"
+    - "Maintain 100% behavior parity via test migration"
+  open_decisions:
+    - "Binary distribution: check-in vs build-step?"
+    - "Single binary vs separate binaries per hook?"
+    - "External rules config vs compile-time embedding?"
+    - "Platform matrix: all (Windows/macOS/Linux) or subset?"
+
+next_recommended: "sdd-verify"

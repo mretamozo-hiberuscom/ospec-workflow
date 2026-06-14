@@ -1,0 +1,1 @@
+Run npm test + go test ./... against these fixtures to assert identical behavior between the JS and Go implementations of the pre-tool-use hook.

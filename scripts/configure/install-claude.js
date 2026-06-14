@@ -18,6 +18,7 @@
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { buildClaudeMarketplace } = require("./claude-marketplace.js");
+const { copyBinaryToTree } = require("./install-target.js");
 
 const MARKETPLACE = "ospec-tools";
 const PLUGIN = "ospec-workflow";
@@ -65,6 +66,10 @@ function main(argv) {
     process.exitCode = build.exitCode;
     return;
   }
+
+  // Copy the platform-appropriate ospec-hooks binary into the Claude plugin tree
+  // (scripts/hooks/). Best-effort: warns and skips if the binary is absent.
+  copyBinaryToTree(build.pluginDir, "claude", process.cwd());
 
   if (buildOnly) {
     process.stdout.write("\nBuilt. Run /reload-plugins in your Claude Code session to apply.\n");
