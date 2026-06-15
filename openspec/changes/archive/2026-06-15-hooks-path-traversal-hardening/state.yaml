@@ -1,0 +1,131 @@
+schema: sdd-change-state
+change: hooks-path-traversal-hardening
+
+origin:
+  follow_up_of: harness-go-migration
+  follow_up_ids:
+    - fu-c1-transcript-path-validation
+    - fu-c2-cwd-path-validation
+  summary: |
+    Path-traversal hardening for the Go ospec-hooks runtime. fu-c1 validates
+    transcript_path before reading in subagent-stop. fu-c2 validates cwd against
+    traversal in precompact/stop/subagentstop handlers.
+
+classification: high-risk
+
+route:
+  intended_route: standard
+  actual_route: standard
+  route_rationale: "project.status: active matched the standard route (first match after foundation/federated/debug/brownfield were not satisfied); classification high-risk (security-sensitive path-traversal handling) fits standard's [normal, high-risk]."
+  validated: true
+  validation_errors: []
+
+session:
+  execution_mode: interactive
+  delivery_strategy: exception-ok
+  artifact_store: openspec
+  strict_tdd: true
+  test_command: "npm test"
+  go_test_command: "go test ./..."
+
+status: archived
+last_updated: 2026-06-15T23:35:00Z
+
+blocking_questions: []
+
+phases:
+  propose:
+    status: done
+    artifact: openspec/changes/archive/2026-06-15-hooks-path-traversal-hardening/proposal.md
+  spec:
+    status: done
+    artifacts:
+      - openspec/changes/archive/2026-06-15-hooks-path-traversal-hardening/specs/hooks-runtime/spec.md
+  clarify:
+    status: done
+    questions_asked: 2
+    artifact: openspec/changes/archive/2026-06-15-hooks-path-traversal-hardening/specs/hooks-runtime/spec.md
+  design:
+    status: done
+    artifact: openspec/changes/archive/2026-06-15-hooks-path-traversal-hardening/design.md
+  tasks:
+    status: done
+    artifact: openspec/changes/archive/2026-06-15-hooks-path-traversal-hardening/tasks.md
+  apply:
+    status: done
+    artifact: openspec/changes/archive/2026-06-15-hooks-path-traversal-hardening/apply-progress.md
+    note: "Batch 2 (2026-06-15): W1/W2 test-hardening applied — discriminating fu-c1 test + hermetic cwd isolation for traversal-cwd tests; no production code changed. Batch 2b (orchestrator fix): replaced t.Chdir (Go 1.24+) with a chdirT helper to preserve the spec's Go 1.23+ minimum; go vet + go test ./... green (7/7). Batch 3 (2026-06-15): 4R CRITICAL root-rejection — validatePath now rejects filesystem/volume roots via filepath.Dir(cleaned)==cleaned; 2 new Windows unit rows (C:\\, UNC), 1 POSIX row (/), 1 behavior test (Windows drive root cwd → fallback to '.'); spec updated with normative root-rejection policy and 4R clarification; go test ./... 7/7, go vet clean."
+  verify:
+    status: done
+    verdict: pass
+    previous_verdict: pass
+    artifact: openspec/changes/archive/2026-06-15-hooks-path-traversal-hardening/verify-report.md
+    note: "Re-verify after Batch 3 (4R CRITICAL root-rejection) complete: PASS. go test ./... 7/7 green, go vet clean (Go 1.23+ preserved; chdirT used, no t.Chdir). Both 4R-gate CRITICALs RESOLVED — validatePath rejects /, C:\\, \\\\host\\share via filepath.Dir(cleaned)==cleaned; new unit rows discriminating (RED before guard, GREEN after); TestSubagentStop_DriveRootCwdFallback (post-GREEN, justified) PASS. fu-c1/fu-c2 discriminating pairs green. Advisory 4R follow-ups accepted out-of-scope. Ready for archive."
+  archive:
+    status: done
+    artifact: openspec/changes/archive/2026-06-15-hooks-path-traversal-hardening/archive-report.md
+    note: "Archived 2026-06-15. Spec synced: openspec/specs/hooks-runtime/spec.md updated with path-traversal requirements (fu-c1, fu-c2) and 4R gate clarifications. Accepted follow-ups recorded: fu-pt1 (transcript I/O logging), fu-pt2 (file-vs-dir test), fu-pt3 (readFilePermissive error test), fu-pt4 (walk error logging). Go 1.23+ compat verified; chdirT helper used throughout tests."
+
+gates:
+  clarify:
+    status: done
+  4r-review-gate:
+    status: done
+    on_blocker: advisory
+    findings_summary: "0 BLOCKER, 2 CRITICAL, 2 WARNING, 2 SUGGESTION (risk: none; readability: none)"
+    surfaced_to_user: true
+    decision: harden-policy-now
+    critical_findings:
+      - "validatePath accepts filesystem root '/' (review-reliability) — RESOLVED in Batch 3"
+      - "validatePath accepts Windows drive root 'C:\\' (review-reliability) — RESOLVED in Batch 3"
+    advisory_followups:
+      - "review-resilience WARNING: swallowed I/O error not logged at subagentstop.go:262"
+      - "review-reliability WARNING: resolveCwd file-vs-dir fallback path untested"
+      - "review-reliability SUGGESTION: readFilePermissive non-ENOENT error path untested"
+      - "review-resilience SUGGESTION: filepath.Walk error swallowed in collectSpecArtifactsPC (pre-existing, out of scope)"
+
+approvals:
+  - id: execution-mode-001
+    gate: execution-mode
+    decision: interactive
+    source: AskUserQuestion
+    accepted_at: "2026-06-15T00:00:00Z"
+    applies_to:
+      - orchestrator
+  - id: delivery-strategy-001
+    gate: delivery-strategy
+    decision: exception-ok
+    source: AskUserQuestion
+    accepted_at: "2026-06-15T00:00:00Z"
+    applies_to:
+      - sdd-tasks
+      - sdd-apply
+  - id: follow-up-selection-001
+    gate: follow-up-selection
+    decision: path-traversal-fu-c1-fu-c2
+    source: AskUserQuestion
+    accepted_at: "2026-06-15T00:00:00Z"
+    applies_to:
+      - orchestrator
+  - id: clarify-transcript-path-policy-001
+    gate: clarify
+    decision: >
+      transcript_path validation: require absolute path AND reject `..`
+      (filepath.IsAbs must be true AND cleaned form must contain no `..`).
+      Mirrors cwd policy; single shared validation helper applies.
+    source: AskUserQuestion
+    accepted_at: "2026-06-15T15:00:00Z"
+    applies_to:
+      - sdd-design
+      - sdd-tasks
+  - id: clarify-cwd-stat-check-001
+    gate: clarify
+    decision: >
+      cwd validation includes os.Stat existing-directory check (current spec
+      behavior). If the absolute, non-traversal cwd does not resolve to an
+      existing directory, fall back to `.`.
+    source: AskUserQuestion
+    accepted_at: "2026-06-15T15:00:00Z"
+    applies_to:
+      - sdd-design
+      - sdd-tasks

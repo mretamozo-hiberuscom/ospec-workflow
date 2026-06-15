@@ -175,6 +175,57 @@ func TestPreCompact_ErrorContinues(t *testing.T) {
 	}
 }
 
+// ── resolveCwd hardening ──────────────────────────────────────────────────────
+
+func TestPreCompact_ResolveCwdHardening(t *testing.T) {
+	t.Run("traversal cwd is non-blocking", func(t *testing.T) {
+		// (a) traversal path — old resolveCwd did not validate; hardened one falls back to ".".
+		// Handler must always emit continue:true and exit 0.
+		stdin, _ := json.Marshal(map[string]any{"cwd": "../../etc"})
+		out, code := hooks.Dispatch([]string{"pre-compact"}, stdin)
+		if code != 0 {
+			t.Errorf("exitCode: got %d, want 0", code)
+		}
+		var r preCompactResult
+		if err := json.Unmarshal(out, &r); err != nil {
+			t.Fatalf("parse: %v; raw=%q", err, out)
+		}
+		if !r.Continue {
+			t.Errorf("continue: got false, want true for traversal cwd")
+		}
+	})
+
+	t.Run("valid tmpdir cwd with empty changes workspace", func(t *testing.T) {
+		// (b) valid absolute cwd that exists — triangulation anchor.
+		ws := createPreCompactWorkspace(t)
+		r, code := runPreCompact(t, ws)
+		if code != 0 {
+			t.Errorf("exitCode: got %d, want 0", code)
+		}
+		if !r.Continue {
+			t.Errorf("continue: got false, want true for valid cwd")
+		}
+	})
+
+	t.Run("non-existent absolute cwd is non-blocking", func(t *testing.T) {
+		// (c) absolute path that does not exist — hardened resolveCwd falls back to ".".
+		// Handler must emit continue:true and exit 0.
+		nonExistent := t.TempDir() + "/nonexistent"
+		stdin, _ := json.Marshal(map[string]any{"cwd": nonExistent})
+		out, code := hooks.Dispatch([]string{"pre-compact"}, stdin)
+		if code != 0 {
+			t.Errorf("exitCode: got %d, want 0", code)
+		}
+		var r preCompactResult
+		if err := json.Unmarshal(out, &r); err != nil {
+			t.Fatalf("parse: %v; raw=%q", err, out)
+		}
+		if !r.Continue {
+			t.Errorf("continue: got false, want true for non-existent absolute cwd")
+		}
+	})
+}
+
 // ── triangulation ──────────────────────────────────────────────────────────────
 
 func TestPreCompact_Triangulate(t *testing.T) {

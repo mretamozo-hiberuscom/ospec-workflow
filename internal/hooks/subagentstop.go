@@ -188,10 +188,12 @@ func findResolutionInJsonLines(content string) string {
 }
 
 // findResolutionInTranscript reads a transcript file and extracts the resolution.
+// The path must be absolute and contain no ".." segment; any rejected path is
+// treated as absent (identical degradation to ENOENT) — no os.ReadFile call is made.
 func findResolutionInTranscript(transcriptPath string) (string, error) {
-	path := strings.TrimSpace(transcriptPath)
-	if path == "" {
-		return "", nil
+	path, ok := validatePath(transcriptPath)
+	if !ok {
+		return "", nil // treated as absent — no readFilePermissive call
 	}
 	data, err := readFilePermissive(path)
 	if err != nil {

@@ -320,12 +320,18 @@ func formatApprovalsPC(content string) []string {
 }
 
 // resolveCwd resolves the workspace from the input cwd field (or returns ".").
+// It applies validatePath (absolute + no "..") then verifies the path is an
+// existing directory via os.Stat.  Any failure falls back to ".".
 func resolveCwd(cwd string) string {
-	ws := strings.TrimSpace(cwd)
-	if ws == "" {
+	cleaned, ok := validatePath(cwd)
+	if !ok {
 		return "."
 	}
-	return filepath.Clean(ws)
+	info, err := os.Stat(cleaned)
+	if err != nil || !info.IsDir() {
+		return "."
+	}
+	return cleaned
 }
 
 // continueWithError returns a {"continue":true,"systemMessage":"..."} payload.

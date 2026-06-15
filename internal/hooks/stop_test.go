@@ -219,6 +219,25 @@ func TestStop_ErrorContinues(t *testing.T) {
 	}
 }
 
+// ── traversal-cwd regression guard ────────────────────────────────────────────
+
+func TestStop_TraversalCwdNonBlocking(t *testing.T) {
+	// Isolate with t.Chdir so the "." fallback writes .ospec/ into a temp dir,
+	// not into the package source directory (internal/hooks/).
+	// Without this isolation the traversal-cwd test contaminates the source tree.
+	chdirT(t, t.TempDir())
+
+	stdin, _ := json.Marshal(map[string]any{"cwd": "../../etc"})
+	r, code := runStopHook(t, stdin)
+
+	if code != 0 {
+		t.Errorf("exitCode: got %d, want 0", code)
+	}
+	if !r.Continue {
+		t.Errorf("continue: got false, want true for traversal cwd")
+	}
+}
+
 // ── triangulation ──────────────────────────────────────────────────────────────
 
 func TestStop_Triangulate(t *testing.T) {
