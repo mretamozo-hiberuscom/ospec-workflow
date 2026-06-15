@@ -42,6 +42,31 @@ jobs:
       - name: Build marketplace
         run: node scripts/configure/claude-marketplace.js --no-validate
 
+      # The hooks invoke scripts/hooks/ospec-hooks-launch.js, which prefers the
+      # compiled Go binary and falls back to the Node hooks. Bundle every
+      # supported platform binary into the published tree so the launcher finds a
+      # native binary on each host; without this the release ships a launcher
+      # with no binary to prefer (the Node fallback still runs, but the fast path
+      # is unavailable). The binaries are gitignored at source, so they reach
+      # users only through this published `release` branch.
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Bundle ospec-hooks binaries
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          hooks_dir="dist/claude-marketplace/plugins/ospec-workflow/scripts/hooks"
+          mkdir -p "$hooks_dir"
+          for tuple in windows:amd64:.exe darwin:arm64: darwin:amd64: linux:amd64:; do
+            IFS=':' read -r goos goarch ext <<< "$tuple"
+            GOOS="$goos" GOARCH="$goarch" \
+              go build -o "$hooks_dir/ospec-hooks-${goos}-${goarch}${ext}" ./cmd/ospec-hooks
+          done
+          ls -la "$hooks_dir"
+
       - name: Publish to release branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
