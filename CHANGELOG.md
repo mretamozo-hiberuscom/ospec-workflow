@@ -8,6 +8,19 @@ Plugin version tracks `.plugin.json` and `.claude-plugin/plugin.json`.
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-06-16
+
+### Fixed
+- Hook runtime delivery: `hooks.json` invoked the compiled `ospec-hooks` binary
+  directly, but that binary is gitignored and the publish workflow never built or
+  bundled it, so it never reached the `release` branch — every install from
+  `release` got a `hooks.json` pointing at a missing binary and all five hooks
+  failed (`ospec-hooks: No such file or directory`). Hooks now run through
+  `scripts/hooks/ospec-hooks-launch.js`, a Node launcher that prefers the
+  per-platform Go binary and falls back to the Node hooks when none ships for the
+  host. `publish-marketplace.yml` cross-compiles all four platform binaries
+  (windows/amd64, darwin/arm64, darwin/amd64, linux/amd64) into the published tree.
+
 ## [2.4.0] - 2026-06-15
 
 ### Added
