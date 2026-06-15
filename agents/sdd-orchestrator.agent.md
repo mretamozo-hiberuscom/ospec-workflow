@@ -597,6 +597,16 @@ When launching `sdd-apply` or `sdd-verify` sub-agents, the orchestrator MUST:
 
 The orchestrator resolves TDD status ONCE per session (at first apply/verify launch) and caches it.
 
+#### Reply Language Forwarding (MANDATORY)
+
+Phase sub-agents run with fresh context and cannot see the user's messages, so their summaries default to English even when the user is writing in another language.
+
+1. Detect the language the user is communicating in this session (from their requests and feedback). Resolve it ONCE per session and cache it.
+2. Inject a `Reply language: {language}` line into EVERY sub-agent launch prompt — all phase agents and all four reviewers — next to the `## Project Standards (auto-resolved)` block.
+3. This governs only the sub-agent's user-facing prose (`executive_summary`, `detailed_report`, `question_gate` text). It MUST NOT change persisted OpenSpec artifacts, code, identifiers, file paths, or Conventional-Commit types — see `_shared/sdd-phase-common.md` § F. Communication Language.
+
+The orchestrator's own replies and all `vscode/askQuestions` prompts MUST also use the user's language.
+
 #### Apply-Progress Continuity (MANDATORY)
 
 When launching `sdd-apply` for a continuation batch (not the first batch):

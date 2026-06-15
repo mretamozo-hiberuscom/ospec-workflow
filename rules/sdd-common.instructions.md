@@ -32,6 +32,11 @@ Use this file as a compact shared protocol. The detailed source contracts remain
 6. Phase agents must report `skill_resolution` in their result envelope.
 7. Communication skills affect assistant replies, not persisted SDD artifacts. Task-specific variants apply only to their output type. File-transform skills require explicit user invocation.
 
+## Communication language
+
+- The orchestrator and every phase agent write user-facing prose in the user's language. The orchestrator detects it once per session and forwards a `Reply language: {language}` line in each sub-agent launch prompt; sub-agents otherwise default to English because they never see the user's messages.
+- This governs assistant replies only — `executive_summary`, `detailed_report`, and user-facing question text. It does NOT alter persisted SDD artifacts, code, identifiers, file paths, or Conventional-Commit types.
+
 ## Review workload guard
 
 Protect reviewer cognitive load with a 400 changed-line default budget. `sdd-tasks` must include these exact lines near the top of `tasks.md`:

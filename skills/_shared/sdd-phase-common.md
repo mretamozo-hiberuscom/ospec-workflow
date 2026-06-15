@@ -182,6 +182,14 @@ SDD must protect reviewer cognitive load, not only generate tasks.
 
 This guard exists to reduce reviewer burnout and keep implementation delivery safe. Do not treat it as optional process noise.
 
+## F. Communication Language
+
+Sub-agents have no memory of the conversation and never see the user's messages, so they default to English unless told otherwise.
+
+- Write all user-facing prose — `executive_summary`, `detailed_report`, and any `question_gate` / `next_question` text — in the language the orchestrator passes as a `Reply language: {language}` line in your launch prompt.
+- If no `Reply language` line is present, mirror the language of the task and context you were given; if still ambiguous, use the repository's prevailing prose language.
+- This applies ONLY to conversational output returned to the user. Do NOT translate persisted OpenSpec artifacts (`spec.md`, `design.md`, `tasks.md`, `state.yaml`, reports), code, identifiers, file paths, YAML keys, status enum values, or Conventional-Commit types — keep those exactly as the phase skill defines them.
+
 ## Runtime continuation
 
 Every phase that writes artifacts must preserve resumability:
