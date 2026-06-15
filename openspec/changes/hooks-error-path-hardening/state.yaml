@@ -1,0 +1,67 @@
+schema: sdd-change-state
+change: hooks-error-path-hardening
+
+origin:
+  follow_up_of: hooks-path-traversal-hardening
+  follow_up_ids:
+    - fu-pt1-transcript-ioerror-logging
+    - fu-pt2-resolvecwd-filevsdir-test
+    - fu-pt3-readfilepermissive-nonenoent-test
+    - fu-pt4-walk-error-swallow
+  summary: |
+    Advisory reliability/resilience follow-ups accepted (not implemented) during the
+    4R review gate of hooks-path-traversal-hardening. Error-path logging + test-coverage
+    hardening of the Go ospec-hooks runtime. No new behavior; observability + test gaps only.
+
+classification: small
+
+route:
+  intended_route: lite
+  actual_route: lite
+  route_rationale: "Bounded reliability/test-hardening across internal/hooks; no architectural change, no public-contract change, no security-behavior change. classification: small -> lite route (phases: propose, tasks, apply, verify; no gates)."
+  validated: true
+  validation_errors: []
+
+session:
+  execution_mode: interactive
+  delivery_strategy: exception-ok
+  artifact_store: openspec
+  strict_tdd: true
+  test_command: "npm test"
+  go_test_command: "go test ./..."
+
+status: planning
+last_updated: 2026-06-15T00:00:00Z
+
+phases:
+  propose:
+    status: done
+    artifact: openspec/changes/hooks-error-path-hardening/proposal-lite.md
+  tasks:
+    status: pending
+  apply:
+    status: pending
+  verify:
+    status: pending
+
+scope_items:
+  - id: fu-pt1-transcript-ioerror-logging
+    severity: WARNING
+    origin: review-resilience
+    where: internal/hooks/subagentstop.go (~line 262, caller of findResolutionInTranscript)
+    problem: "Non-ENOENT/EACCES I/O error from findResolutionInTranscript is caught via `if err == nil` and silently dropped (no log/systemMessage), hiding real disk errors."
+  - id: fu-pt2-resolvecwd-filevsdir-test
+    severity: WARNING
+    origin: review-reliability
+    where: internal/hooks/precompact.go (resolveCwd, !info.IsDir branch) + precompact_test.go
+    problem: "The fallback-to-'.' branch when cwd resolves to a file (not a directory) is untested."
+  - id: fu-pt3-readfilepermissive-nonenoent-test
+    severity: SUGGESTION
+    origin: review-reliability
+    where: internal/hooks/subagentstop.go (readFilePermissive non-ENOENT/EACCES return) + subagentstop_test.go
+    problem: "The error-propagation path for I/O errors other than ENOENT/EACCES is untested."
+  - id: fu-pt4-walk-error-swallow
+    severity: SUGGESTION
+    origin: review-resilience
+    where: internal/hooks/precompact.go (collectSpecArtifactsPC, filepath.Walk callback)
+    problem: "filepath.Walk errors are swallowed (return nil) without logging; incomplete artifact discovery is silent. Pre-existing behavior — confirm desired policy before changing."
