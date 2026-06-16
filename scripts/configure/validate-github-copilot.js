@@ -275,6 +275,25 @@ function validateHookScripts(root, errors) {
   }
 }
 
+// Scan .mcp.json for unresolved ${input:NAME} placeholders. These residuals
+// indicate the profile forgot to opt in to mcpPlaceholders normalization.
+// Mirrors the FORBIDDEN_TEXT walk but scoped to a single file.
+function validateMcpResidualPlaceholders(root, errors) {
+  const rel = ".mcp.json";
+  if (pathType(root, rel) !== "file") {
+    return;
+  }
+  let text;
+  try {
+    text = readUtf8(root, rel);
+  } catch {
+    return; // read failure already covered by validateRequiredPaths
+  }
+  if (/\$\{input:/.test(text)) {
+    addError(errors, `residual \${input: placeholder found in ${rel} — profile must opt in to mcpPlaceholders normalization`);
+  }
+}
+
 // .mcp.json passes through unchanged; confirm it is a usable Copilot MCP config:
 // an mcpServers object whose entries each define a command (stdio) or url (http/sse).
 function validateMcp(root, errors) {
@@ -327,6 +346,7 @@ function validate(root) {
   validateSkillReferences(absRoot, errors);
   validateHookScripts(absRoot, errors);
   validateMcp(absRoot, errors);
+  validateMcpResidualPlaceholders(absRoot, errors);
 
   return { errors, warnings };
 }

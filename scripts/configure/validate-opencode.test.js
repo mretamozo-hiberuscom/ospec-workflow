@@ -124,6 +124,24 @@ test("validate requires the skills tree so agent skill references resolve", (t) 
   assert.ok(result.errors.some((error) => error.includes("missing required path: skills")));
 });
 
+test("validate rejects residual ${input: placeholder in opencode.json", (t) => {
+  const out = tmpOut(t);
+  runConfigure({ sourceDir: SOURCE, target: "opencode", outDir: out, validate: false });
+  // Poison the generated opencode.json with an unresolved input placeholder.
+  const cfg = JSON.parse(fs.readFileSync(path.join(out, "opencode.json"), "utf8"));
+  cfg.mcp = cfg.mcp || {};
+  cfg.mcp.svc = { type: "local", command: ["npx"], enabled: true, environment: { RESIDUAL_KEY: "${input:RESIDUAL_KEY}" } };
+  fs.writeFileSync(path.join(out, "opencode.json"), JSON.stringify(cfg, null, 2));
+
+  const result = validate(out);
+
+  assert.ok(result.errors.length > 0, "must report at least one error");
+  assert.ok(
+    result.errors.some((error) => error.includes("${input:")),
+    "at least one error must reference the residual placeholder",
+  );
+});
+
 test("validate rejects an agent that references a skill the tree does not ship", (t) => {
   const out = tmpOut(t);
   runConfigure({ sourceDir: SOURCE, target: "opencode", outDir: out, validate: false });
