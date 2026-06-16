@@ -1,0 +1,62 @@
+schema: sdd-change-state
+change: mcp-placeholder-normalization
+
+classification: normal
+
+session:
+  artifact_store: openspec
+  delivery_strategy: single-pr
+
+status: ready-for-verify
+last_updated: 2026-06-16T14:00:00Z
+
+blocking_questions: []
+
+phases:
+  proposal:
+    status: done
+    artifact: openspec/changes/mcp-placeholder-normalization/proposal.md
+  spec:
+    status: done
+    artifacts:
+      - openspec/changes/mcp-placeholder-normalization/specs/generator/spec.md
+  design:
+    status: done
+    artifact: openspec/changes/mcp-placeholder-normalization/design.md
+  tasks:
+    status: done
+    artifact: openspec/changes/mcp-placeholder-normalization/tasks.md
+  apply:
+    status: done
+    artifact: openspec/changes/mcp-placeholder-normalization/apply-progress.md
+  verify:
+    status: pending
+  archive:
+    status: pending
+
+open_decisions:
+  - id: A-default-empty-form
+    status: resolved
+    resolution: >
+      Emit ${CONTEXT7_API_KEY:-} (empty default). See design.md "Decisions >
+      Decision A". Residual (non-blocking): confirm context7 keyless fallback on
+      empty key.
+    summary: >
+      Emit ${CONTEXT7_API_KEY:-} (empty default) vs bare ${CONTEXT7_API_KEY}.
+      Recommended: empty-default so Claude never fails to parse when unset.
+      Confirm context7 treats empty-string key as "no key".
+    applies_to:
+      - sdd-design
+  - id: B-copilot-var-prefix
+    status: resolved
+    resolution: >
+      Scope to Copilot CLI (local) only; placeholder rewrite, NOT variable
+      renaming. Cloud COPILOT_MCP_ prefix renaming deferred as explicit
+      out-of-scope follow-up. See design.md "Decisions > Decision B".
+    summary: >
+      Copilot cloud coding agent only exposes COPILOT_MCP_-prefixed secrets, so
+      CONTEXT7_API_KEY may need renaming to COPILOT_MCP_CONTEXT7_API_KEY there.
+      Variable renaming (not just placeholder rewrite) and may diverge CLI-local
+      vs cloud. Decide scope in design.
+    applies_to:
+      - sdd-design
