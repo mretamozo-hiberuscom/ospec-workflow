@@ -79,7 +79,7 @@ function handleFile(file, profile, models, rulesContent) {
     return handleCommand(file, profile);
   }
 
-  // Step 8: .mcp.json for profiles with MCP placeholder normalization enabled.
+  // .mcp.json for profiles with MCP placeholder normalization enabled.
   // Must sit before passthrough so profiles without mcpPlaceholders fall through.
   if (profile.mcpPlaceholders && path === ".mcp.json") {
     return normalizeMcpPlaceholders(file);
@@ -540,8 +540,10 @@ function mapVarValuesWith(obj, fn) {
 }
 
 // Parse .mcp.json, rewrite only env/args/url/headers string values via
-// toEnvExpansion, reserialize. command is intentionally NOT rewritten.
-// Returns a fresh { path, content } — input file is never mutated.
+// toEnvExpansion, reserialize. command is intentionally NOT rewritten
+// (it is an executable path, not a secret value — ${input:…} placeholders
+// are not expected there). Returns a fresh { path, content } — input file
+// is never mutated.
 function normalizeMcpPlaceholders(file) {
   const obj = JSON.parse(file.content);
   for (const server of Object.values(obj.mcpServers || {})) {
