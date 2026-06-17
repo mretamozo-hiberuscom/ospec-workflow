@@ -309,3 +309,126 @@ None blocking. Implementation notes:
 - [ ] WU5 (Phase 6) — `.gitignore`, `persistence-contract.md`, orchestrator note + final verification (depends on WU1–WU4).
 
 **Next recommended**: run WU4 — `sdd-workspace` `enroll` + `explore` subcommand (depends on WU1+WU2, both already committed).
+
+---
+
+# WU4 — `sdd-workspace` enroll + explore Subcommand
+
+**Batch**: WU4 (Phase 5) — built on top of WU1 (`4efe753`), WU2 (`f30ab07`), WU3 (`06462da`) on `feat/federation-distributed-markers`. Per the chain, WU4 depends on WU1+WU2 (both already committed).
+**Mode**: Strict TDD (strict_tdd: true, runner `npm test` → `node scripts/check.js` → `node --test scripts/**/*.test.js` + 4 target generators).
+**Delivery**: Feature Branch Chain (approval `review-workload-001`) — this batch = **WU4**, child PR on top of WU2's branch.
+**Skill resolution**: fallback-config (no `.ospec/cache/skill-registry.cache.json`; rules injected via `## Project Standards` from `openspec/config.yaml`).
+
+## Scope of this batch
+
+- **Phase 5: WU4 — `sdd-workspace` `enroll` + `explore`/`classify` subcommand** (tasks 5.1–5.5):
+  the executable backbone `scripts/lib/federation-explore.js` (discover → classify → enroll →
+  regenerate atlas + map) plus the skill/agent documentation for `enroll` and `explore`.
+
+Phase 6 (WU5) is **NOT** implemented in this batch and remains pending.
+
+## Per-task status (WU4)
+
+### Phase 5 — WU4
+
+- [x] 5.1 RED-first integration tests in new `scripts/lib/federation-explore.test.js` (`fs.mkdtemp` container fixtures): 3-members-all-classifiable → 3 artifact types written + atlas has all ids; node-service classified `microservicio`/`dominio`/brownfield; csproj-only classified `nuget`/`common`/greenfield; undeterminable stack → `type: null` + per-member warning, member still enrolled; `.git`-as-plain-file (worktree) counted as a member; empty container → no artifacts + warning; partial enroll failure (`openspec` is a file) → member recorded `pending` with reason, atlas built from survivors only; re-run → marker byte-stable (`updated_at` not advanced, enroll `fresh`); `classifyMember` shared-dir → `layer: common`.
+- [x] 5.2 `skills/sdd-workspace/SKILL.md` — relaxed Hard Rules to allow the single `enroll` member write (D7, orchestrator-only); added `enroll` execution-step (idempotent, byte-stable) with the **stale contract-graph operational caveat**; added `explore`/`classify` execution-step (depth-1 `scanMemberMarkers` → 4-dimension classify → per-member `enroll` → `mergeMarkersIntoAtlas` → `serializeAtlas` → write `workspace.yaml` + `workspace-map.md`; per-member failure → `pending`, continue; empty container → no artifacts); extended the Decision Gates table.
+- [x] 5.3 `agents/sdd-workspace.agent.md` — added `enroll`/`explore` to the subcommand list (enroll annotated orchestrator-only, idempotent; explore partial-failure semantics); relaxed the member READ-ONLY artifact note to the D7 `enroll` exception; added the stale-graph caveat; updated the Result Contract `artifacts`/`risks` lines.
+- [x] 5.4 `agents/sdd-orchestrator.agent.md` — extended the `Workspace Federation` section: markers-as-truth (C1 inversion), atlas-as-derived-cache, `enroll` as the only member write, `sdd-workspace explore` as the federation front door, and a D11 coordinator-repo informational note (NOT designed in C1).
+- [x] 5.5 Full `npm test` green; WU1–WU3 baseline + WU4 tests all pass.
+
+## Test evidence (WU4)
+
+| Run | Command | Result |
+|-----|---------|--------|
+| Safety-net baseline | `node --test workspace-atlas.test.js federation-marker.test.js artifact-store.test.js` | `50 pass / 0 fail` |
+| RED gate | `node --test scripts/lib/federation-explore.test.js` (test present, module absent) | `0 pass / 1 fail` (module `./federation-explore.js` cannot be required) |
+| GREEN | `node --test scripts/lib/federation-explore.test.js` (after impl) | `9 pass / 0 fail / 0 skipped` |
+| Full suite (5.5) | `npm test` (`node scripts/check.js`) | `All checks passed.` (4 targets generate + validate; `0 errors, 0 warnings`) |
+| Full native suite | `node --test scripts/**/*.test.js` | `346 pass / 0 fail / 0 skipped` (337 WU1+WU2+WU3 baseline + 9 WU4) |
+
+> The known WU1 `git` integration flake in `artifact-store.test.js` did NOT appear this run
+> (full native suite `346/346` clean). It is outside WU4 scope.
+
+## TDD Cycle Evidence (WU4)
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 5.1 `explore` artifacts/partial/empty/worktree/idempotent | `federation-explore.test.js` | Integration (fs container fixtures) | ✅ 50/50 | ✅ Written | ✅ Passed | ✅ 9 cases (3-artifacts / micro+dominio+brownfield / nuget+common+greenfield / type-null+warning / worktree-file / empty-container / partial-fail+pending / byte-stable re-run / shared-dir layer) | ➖ Clean as written |
+| 5.1 `classifyMember` | `federation-explore.test.js` | Unit (fs probes) | ✅ 50/50 | ✅ Written | ✅ Passed | ✅ type micro/nuget/null + layer dominio/common + brownfield true/false | ✅ Extracted `detectType`/`deriveLayer`/`hasSourceFiles` helpers |
+| 5.2–5.4 skill/agent contract | `skills/sdd-workspace/SKILL.md`, `agents/*.agent.md` | Doc contract | N/A | ➖ Prose | ✅ `npm test` validators green | ➖ Prose only | ➖ Prose only |
+
+### Test Summary (WU4)
+
+- Total new tests written: 9 (all in `scripts/lib/federation-explore.test.js`)
+- Total tests passing (full native suite): 346 (337 WU1+WU2+WU3 baseline + 9 WU4)
+- Layers used: Integration (8), Unit (1)
+- Approval tests (refactoring): None — WU4 adds a new module + additive doc sections; no existing test modified
+- Pure functions created: `detectType`, `deriveLayer`, `renderWorkspaceMap` (+ helpers); `classifyMember`/`explore` are I/O-bound by necessity (filesystem discovery + atomic enroll)
+
+## Files touched (WU4)
+
+| File | Action | What was done |
+|------|--------|---------------|
+| `scripts/lib/federation-explore.js` | Created | Executable backbone of the `explore`/`classify` subcommand: `classifyMember` (type/layer/brownfield/init-done from manifests + fs probes) and `explore(containerRoot)` (depth-1 discover via `scanMemberMarkers` → classify → idempotent `enroll` per member → `mergeMarkersIntoAtlas` → `serializeAtlas` → write `workspace.yaml` + `workspace-map.md`; per-member enroll failure recorded `pending` and never aborts; empty container writes no artifacts). Reuses WU1 `scanMemberMarkers`/`mergeMarkersIntoAtlas`/`serializeAtlas` and WU2 `enroll`. |
+| `scripts/lib/federation-explore.test.js` | Created | 9 RED-first integration/unit tests with `fs.mkdtemp` container fixtures (3-artifacts, classification triangulation, type-null warning, worktree `.git` file, empty container, partial-failure `pending`, byte-stable re-run, shared-dir layer). |
+| `skills/sdd-workspace/SKILL.md` | Modified (additive) | Relaxed Hard Rules to the D7 single-`enroll`-write exception; added `enroll` and `explore`/`classify` execution-steps + stale-graph caveat; extended Decision Gates. |
+| `agents/sdd-workspace.agent.md` | Modified (additive) | Added `enroll`/`explore` subcommands (orchestrator-only enroll; partial-failure semantics), the D7 member-write note, the stale-graph caveat, and updated Result Contract lines. |
+| `agents/sdd-orchestrator.agent.md` | Modified (additive) | Extended `Workspace Federation` with markers-as-truth, derived-cache atlas, explore-as-front-door, and a D11 coordinator-repo informational note. |
+| `openspec/changes/federation-distributed-markers/tasks.md` | Modified | Phase 5 (5.1–5.5) checked off `[x]`. |
+| `openspec/changes/federation-distributed-markers/state.yaml` | Modified | `WU4.status: done` (phases `[Phase 5]`); chain slice WU4 `done`; apply stays `partial`, top-level `applying`. |
+| `openspec/changes/federation-distributed-markers/apply-progress.md` | Modified | Appended this WU4 section; WU1 + WU2 + WU3 history preserved verbatim. |
+
+## Suggested work-unit commit (WU4)
+
+Not committed/pushed (left staged-ready for the maintainer). Suggested single work-unit commit grouping the WU4 tests + implementation + documentation:
+
+```
+feat(federation): subcomando explore/classify y enroll de sdd-workspace
+
+Crea scripts/lib/federation-explore.js como backbone ejecutable del subcomando explore:
+descubre miembros del contenedor a profundidad 1 (scanMemberMarkers, .git directorio o
+archivo de worktree), clasifica cada uno en type/layer/brownfield/init-done desde
+manifiestos secundarios y sondeos de filesystem, llama enroll por miembro (idempotente y
+atomico de WU2) y regenera el cache derivado openspec/workspace.yaml (mergeMarkersIntoAtlas
++ serializeAtlas de WU1) mas openspec/workspace-map.md. Un fallo de enroll por miembro se
+registra como pending con su motivo y nunca aborta la corrida; el atlas se reconstruye solo
+con los marcadores realmente escritos; un contenedor vacio no escribe artefactos. Documenta
+en skills/sdd-workspace/SKILL.md (relaja la regla de solo-lectura a la unica escritura
+enroll por D7, anade operaciones enroll y explore/classify con el aviso de grafo de
+contratos obsoleto), agents/sdd-workspace.agent.md (subcomandos enroll/explore, enroll solo
+para el orquestador) y agents/sdd-orchestrator.agent.md (marcadores como verdad, atlas como
+cache derivado, explore como puerta de entrada y nota informativa del repo coordinador D11).
+Cobertura TDD: 9 tests nuevos; suite completa 346/346 en verde.
+```
+
+## Deviations from design (WU4)
+
+None blocking. Implementation notes:
+- **New `scripts/lib/federation-explore.js` module**: the design's File-Changes table realizes
+  `explore` as a `sdd-workspace` SKILL.md subcommand (agent procedure) and does not enumerate a
+  JS module. However, task 5.1 mandates an EXECUTABLE integration test (`federation-explore.test.js`,
+  `fs.mkdtemp` fixtures asserting written artifacts), which requires a real implementation. The
+  module name is implied by the test filename. The module is the executable backbone the SKILL.md
+  procedure documents, and it composes only already-shipped WU1/WU2 functions — purely additive,
+  consistent with the WU1/WU2 lib-module pattern. No existing module was modified.
+- **Deterministic enroll-failure injection**: the partial-failure scenario is exercised by creating
+  the failing member's `openspec` path as a FILE, so `enroll`'s `mkdir(openspec, { recursive })`
+  throws naturally — no mocking/DI seam needed (mirrors WU1's real-fixture approach over mocks).
+- **Explore-written markers omit `roster`**: explore cannot reliably determine member remotes from
+  the filesystem, so it writes only `federation` + `member` blocks. This also avoids sparse roster
+  entries clobbering a member's own rich entry under WU1's latest-wins merge, keeping each atlas
+  member equal to its own marker's block. `roster` remains fully supported by parse/serialize for
+  other callers.
+- **Classification heuristics**: type from secondary manifest (`*.csproj` → `nuget`,
+  `package.json`/`go.mod` → `microservicio`, else `null` + warning); layer from directory convention
+  (`common`/`shared`) or `nuget` → `common`, else `dominio`; brownfield from a bounded (depth-3,
+  skip `.git`/`openspec`/`node_modules`/build dirs) source-extension probe; init-done from
+  `openspec/config.yaml` presence. These satisfy every `Member Classification` spec scenario and are
+  refinable when richer signals (user prompts) land in C2+.
+
+## Remaining work (NOT in this batch)
+
+- [ ] WU5 (Phase 6) — `.gitignore`, `persistence-contract.md`, orchestrator note + final verification (depends on WU1–WU4).
+
+**Next recommended**: run WU5 — `.gitignore` (`openspec/workspace.yaml`), `persistence-contract.md` atlas-as-derived-cache section, and final full-suite verification (depends on WU1–WU4, all now staged).

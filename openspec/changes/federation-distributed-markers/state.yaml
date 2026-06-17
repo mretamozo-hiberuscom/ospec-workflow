@@ -25,7 +25,7 @@ session:
   reply_language: es
 
 status: applying
-last_updated: 2026-06-17T13:00:00Z
+last_updated: 2026-06-17T14:00:00Z
 
 route:
   intended_route: standard
@@ -92,7 +92,9 @@ phases:
       WU3:
         status: done
         phases: ["Phase 4"]
-      WU4: { status: pending }
+      WU4:
+        status: done
+        phases: ["Phase 5"]
       WU5: { status: pending }
   verify:
     status: pending
@@ -146,7 +148,7 @@ chain:
     - id: WU4
       scope: sdd-workspace enroll + explore subcommand
       depends_on: [WU1, WU2]
-      status: pending
+      status: done
     - id: WU5
       scope: .gitignore, persistence-contract.md, orchestrator note, final verification
       depends_on: [WU1, WU2, WU3, WU4]

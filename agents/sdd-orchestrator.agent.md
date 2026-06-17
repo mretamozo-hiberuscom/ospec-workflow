@@ -352,6 +352,24 @@ cross-cutting proposal/design and a `federation.yaml` linking member slices. Use
 `sdd-workspace` (`init`/`status`/`impact`) as the front door; add it to the `agents` list
 when operating a federated workspace.
 
+**Markers as truth (C1 inversion).** The canonical federation source of truth is the
+per-member marker `openspec/federation.member.yaml`, not the coordinator atlas.
+`openspec/workspace.yaml` is a **derived, gitignored, regenerable cache** of those markers:
+trusted when valid, regenerated when absent or corrupt. The ONLY sanctioned member-repo
+write is `enroll` (the marker), performed exclusively through `sdd-workspace`.
+
+**Explore is the federation front door.** `sdd-workspace explore` realizes the
+workspace-explore phase: depth-1 container discovery, per-member classification
+(type/layer/brownfield/init-done), idempotent `enroll`, then regeneration of the atlas
+cache and `openspec/workspace-map.md`. A per-member enroll failure is recorded as
+`pending` and never aborts the run. Route a fresh multi-repo container through
+`sdd-workspace explore` before any cross-repo planning.
+
+> **Future interface (informational, NOT designed in C1).** A D11 dedicated *coordinator
+> repo* — a standalone repo that owns the cross-cutting atlas/roster and orchestrates
+> member changes — is a planned follow-on interface. C1 ships only the marker mechanism
+> and the explore phase; do not assume a coordinator repo exists yet.
+
 
 ### Execution Mode
 
