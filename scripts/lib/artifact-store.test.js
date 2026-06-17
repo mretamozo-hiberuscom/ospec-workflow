@@ -5,6 +5,7 @@ const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
+const { spawnSync } = require("node:child_process");
 
 const {
   ARTIFACT_STORE_MODES,
@@ -288,4 +289,112 @@ test("workspace-federated: skips an unreachable member without throwing", async 
     ["add-endpoint"],
   );
   assert.equal(active.warnings[0].member, "ghost");
+});
+
+const VALID_MARKER = [
+  "federation:",
+  "  id: fed-001",
+  "member:",
+  "  id: svc-api",
+  "  role: primary",
+  "  type: microservicio",
+  "  layer: dominio",
+  "  remote: https://example.com/api.git",
+  "  provides:",
+  "    - { id: api-public, consumers: [svc-web], surface: openapi }",
+  "roster:",
+  "  - { id: svc-api, remote: https://example.com/api.git }",
+  "updated_at: 2026-06-17T10:00:00.000Z",
+  "",
+].join("\n");
+
+async function writeMemberMarker(workspace, memberDir, marker) {
+  const memberRoot = path.join(workspace, memberDir);
+
+  await fs.mkdir(path.join(memberRoot, ".git"), { recursive: true });
+  await fs.mkdir(path.join(memberRoot, "openspec"), { recursive: true });
+  await fs.writeFile(
+    path.join(memberRoot, "openspec", "federation.member.yaml"),
+    marker,
+  );
+}
+
+function captureWarn(t) {
+  const warnings = [];
+  const original = console.warn;
+
+  console.warn = (...args) => warnings.push(args.join(" "));
+  t.after(() => {
+    console.warn = original;
+  });
+
+  return warnings;
+}
+
+function gitAvailable() {
+  const probe = spawnSync("git", ["--version"], { stdio: "ignore" });
+
+  return !probe.error && probe.status === 0;
+}
+
+test("workspace-federated: regenerates the atlas from markers when it is absent", async (t) => {
+  const workspace = await createWorkspace(t);
+  await writeMemberMarker(workspace, "member-api", VALID_MARKER);
+
+  const store = createArtifactStore({ mode: "workspace-federated", workspace });
+
+  assert.equal(await store.isInitialized(), true);
+
+  const written = await fs.readFile(
+    path.join(workspace, "openspec", "workspace.yaml"),
+    "utf8",
+  );
+
+  assert.match(written, /id: svc-api/);
+});
+
+test("workspace-federated: regenerates and warns when the cache is corrupt", async (t) => {
+  const workspace = await createWorkspace(t);
+  await writeMemberMarker(workspace, "member-api", VALID_MARKER);
+  await writeAtlas(workspace, "::: not valid atlas yaml :::\n\t}{][\n");
+
+  const warnings = captureWarn(t);
+  const store = createArtifactStore({ mode: "workspace-federated", workspace });
+
+  assert.equal(await store.isInitialized(), true);
+  assert.ok(warnings.some((warning) => /corrupt/i.test(warning)));
+});
+
+test("workspace-federated: warns but keeps loading when workspace.yaml is git-tracked", async (t) => {
+  if (!gitAvailable()) {
+    t.skip("git is not available");
+    return;
+  }
+
+  const workspace = await createWorkspace(t);
+
+  spawnSync("git", ["init"], { cwd: workspace, stdio: "ignore" });
+  spawnSync("git", ["config", "user.email", "t@example.com"], {
+    cwd: workspace,
+    stdio: "ignore",
+  });
+  spawnSync("git", ["config", "user.name", "tester"], {
+    cwd: workspace,
+    stdio: "ignore",
+  });
+  await writeAtlas(
+    workspace,
+    ["members:", "  - id: api", "    path: member-api"].join("\n"),
+  );
+  spawnSync("git", ["add", "openspec/workspace.yaml"], {
+    cwd: workspace,
+    stdio: "ignore",
+  });
+
+  const warnings = captureWarn(t);
+  const store = createArtifactStore({ mode: "workspace-federated", workspace });
+  const described = await store.describeWorkspace();
+
+  assert.ok(described && described.members.length === 1);
+  assert.ok(warnings.some((warning) => /git rm --cached/.test(warning)));
 });

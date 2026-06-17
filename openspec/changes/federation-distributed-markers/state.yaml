@@ -1,0 +1,151 @@
+schema: sdd-change-state
+change: federation-distributed-markers
+
+classification: high-risk
+
+program:
+  anchor: openspec/changes/federation-distributed-markers/program.md
+  role: C1 — mechanism layer + workspace-explore phase
+  scope_note: >
+    Scope reduced to the federation MECHANISM (`.git` discovery, marker schema with
+    type/layer, atlas-as-derived-cache, enroll, target_dir for sdd-init) plus the
+    workspace-explore/classify phase. The foundation pipeline (baseline orchestration,
+    general foundation, general baseline, roadmap/gaps) is split into follow-on changes
+    C2–C5, registered in program.md and planned in dependency order.
+  follow_on_changes:
+    - federated-baseline-orchestration
+    - federated-foundation
+    - federated-general-baseline
+    - federated-roadmap-gaps
+
+session:
+  artifact_store: openspec
+  execution_mode: interactive
+  delivery_strategy: single-pr
+  reply_language: es
+
+status: applying
+last_updated: 2026-06-17T00:00:00Z
+
+route:
+  intended_route: standard
+  actual_route: standard
+  route_rationale: >
+    project.status=active and classification=high-risk. The federated route was
+    NOT selected because this repo's artifact_store.backend is `openspec`
+    (single-repo); the change is ABOUT federation but is built in a single repo.
+    sdd-explore is run as a pre-phase to map the existing federation code before
+    proposing, because the redesign inverts the atlas contract over tested code.
+  validated: true
+  validation_errors: []
+
+blocking_questions: []
+
+phases:
+  explore:
+    status: done
+    artifact: openspec/changes/federation-distributed-markers/exploration.md
+  proposal:
+    status: done
+    artifact: openspec/changes/federation-distributed-markers/proposal.md
+  spec:
+    status: done
+    artifacts:
+      - openspec/changes/federation-distributed-markers/specs/federation-markers/spec.md
+      - openspec/changes/federation-distributed-markers/specs/workspace-explore/spec.md
+      - openspec/changes/federation-distributed-markers/specs/agents/spec.md
+      - openspec/changes/federation-distributed-markers/specs/skills/spec.md
+    residual_ambiguity: false
+    amendments:
+      - date: 2026-06-17
+        summary: >
+          member.provides promoted from string[] to object[] with sub-fields
+          id (MUST), consumers (MAY empty), surface (MAY absent). New Requirement
+          "Impact Set from Provides Consumers" added with 2 scenarios. Merge
+          semantics note added (provides adopted wholesale). Clarification entry
+          registered.
+  clarify:
+    status: done
+    questions_asked: 4
+    residual_ambiguity: false
+    artifacts:
+      - openspec/changes/federation-distributed-markers/specs/federation-markers/spec.md
+      - openspec/changes/federation-distributed-markers/specs/workspace-explore/spec.md
+      - openspec/changes/federation-distributed-markers/specs/agents/spec.md
+      - openspec/changes/federation-distributed-markers/specs/skills/spec.md
+  design:
+    status: done
+    artifact: openspec/changes/federation-distributed-markers/design.md
+  tasks:
+    status: done
+    artifact: openspec/changes/federation-distributed-markers/tasks.md
+  apply:
+    status: partial
+    artifact: openspec/changes/federation-distributed-markers/apply-progress.md
+    work_units:
+      WU1:
+        status: done
+        phases: ["Phase 1", "Phase 2"]
+      WU2: { status: pending }
+      WU3: { status: pending }
+      WU4: { status: pending }
+      WU5: { status: pending }
+  verify:
+    status: pending
+  archive:
+    status: pending
+
+approvals:
+  - id: execution-mode-001
+    gate: execution-mode
+    decision: interactive
+    source: vscode/askQuestions
+    accepted_at: 2026-06-17T00:00:00Z
+    applies_to:
+      - sdd-orchestrator
+  - id: delivery-strategy-001
+    gate: delivery-strategy
+    decision: single-pr
+    source: vscode/askQuestions
+    accepted_at: 2026-06-17T00:00:00Z
+    applies_to:
+      - sdd-tasks
+      - sdd-apply
+  - id: review-workload-001
+    gate: review-workload
+    decision: feature-branch-chain
+    source: vscode/askQuestions
+    accepted_at: 2026-06-17T00:00:00Z
+    rationale: >
+      tasks forecast ~580–650 net lines across 13 files, exceeds the 400-line
+      budget. User chose a chained delivery over size:exception. sdd-apply
+      implements only the next autonomous slice per run, using work-unit commits.
+    applies_to:
+      - sdd-apply
+
+chain:
+  strategy: feature-branch-chain
+  order: [WU1, WU2, WU3, WU4, WU5]
+  slices:
+    - id: WU1
+      scope: workspace-atlas.js marker read/merge/serialize + loadAtlas regeneration branch + Phase 1 regression baseline
+      risk: high
+      status: done
+    - id: WU2
+      scope: federation-marker.js enroll (idempotent, atomic)
+      depends_on: [WU1]
+      status: pending
+    - id: WU3
+      scope: sdd-init container detection + target_dir via ## Parameters
+      depends_on: [WU1]
+      status: pending
+    - id: WU4
+      scope: sdd-workspace enroll + explore subcommand
+      depends_on: [WU1, WU2]
+      status: pending
+    - id: WU5
+      scope: .gitignore, persistence-contract.md, orchestrator note, final verification
+      depends_on: [WU1, WU2, WU3, WU4]
+      status: pending
+
+open_decisions: []

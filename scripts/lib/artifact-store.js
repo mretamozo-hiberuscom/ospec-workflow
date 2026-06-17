@@ -2,6 +2,7 @@
 
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 
 const ospec = require("./ospec-state.js");
 const atlas = require("./workspace-atlas.js");
@@ -133,16 +134,77 @@ function createWorkspaceFederatedStore(workspace) {
   const base = createCoordinatorSurface(workspace);
   const atlasPath = path.join(workspace, "openspec", "workspace.yaml");
 
-  async function loadAtlas() {
+  // The atlas cache is corrupt when a non-empty file yields no usable content.
+  // parseAtlas is intentionally lenient (it never throws), so garbage parses to
+  // empty collections — that is the signal to regenerate from the markers.
+  function isCorruptCache(content, parsed) {
+    return (
+      Boolean(content.trim()) &&
+      parsed.members.length === 0 &&
+      parsed.contracts.length === 0
+    );
+  }
+
+  async function regenerateAtlas() {
+    const scanned = await atlas.scanMemberMarkers(workspace);
+    const markers = scanned
+      .filter((entry) => entry.marker)
+      .map((entry) => entry.marker);
+    const { atlas: regenerated } = atlas.mergeMarkersIntoAtlas(markers);
+
+    await fs.mkdir(path.dirname(atlasPath), { recursive: true });
+    await fs.writeFile(atlasPath, atlas.serializeAtlas(regenerated));
+
+    return regenerated;
+  }
+
+  // Warn-on-detect only: the derived cache must not be tracked by git. Fail-open
+  // when git is absent or errors (e.g. outside a repository); never mutate git.
+  function warnIfGitTracked() {
     try {
-      return atlas.parseAtlas(await fs.readFile(atlasPath, "utf8"));
+      const result = spawnSync("git", ["ls-files", "openspec/workspace.yaml"], {
+        cwd: workspace,
+        encoding: "utf8",
+      });
+
+      if (result.status === 0 && result.stdout && result.stdout.trim()) {
+        console.warn(
+          'openspec/workspace.yaml is a derived cache but is tracked by git. ' +
+            'Run "git rm --cached openspec/workspace.yaml" to untrack it.',
+        );
+      }
+    } catch {
+      // git unavailable or failed — migration detection is best-effort.
+    }
+  }
+
+  async function loadAtlas() {
+    let content;
+
+    try {
+      content = await fs.readFile(atlasPath, "utf8");
     } catch (error) {
       if (error.code === "ENOENT") {
-        return null;
+        const regenerated = await regenerateAtlas();
+
+        warnIfGitTracked();
+        return regenerated;
       }
 
       throw error;
     }
+
+    let parsed = atlas.parseAtlas(content);
+
+    if (isCorruptCache(content, parsed)) {
+      console.warn(
+        "openspec/workspace.yaml is corrupt; regenerating it from member markers.",
+      );
+      parsed = await regenerateAtlas();
+    }
+
+    warnIfGitTracked();
+    return parsed;
   }
 
   return {
