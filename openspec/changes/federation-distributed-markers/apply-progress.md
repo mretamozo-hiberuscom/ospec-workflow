@@ -432,3 +432,144 @@ None blocking. Implementation notes:
 - [ ] WU5 (Phase 6) — `.gitignore`, `persistence-contract.md`, orchestrator note + final verification (depends on WU1–WU4).
 
 **Next recommended**: run WU5 — `.gitignore` (`openspec/workspace.yaml`), `persistence-contract.md` atlas-as-derived-cache section, and final full-suite verification (depends on WU1–WU4, all now staged).
+
+---
+
+# WU5 — Docs, `.gitignore`, and Final Verification (FINAL slice)
+
+**Batch**: WU5 (Phase 6) — built on top of WU1 (`4efe753`), WU2 (`f30ab07`), WU3 (`06462da`), WU4 (`fda2c5e`) on `feat/federation-distributed-markers`. WU5 is the final slice and depends on WU1–WU4 (all committed).
+**Mode**: Strict TDD (strict_tdd: true, runner `npm test` → `node scripts/check.js` → `node --test scripts/**/*.test.js` + 4 target generators).
+**Delivery**: Feature Branch Chain (approval `review-workload-001`) — this batch = **WU5**, final child PR on top of WU4's branch.
+**Skill resolution**: fallback-config (no `.ospec/cache/skill-registry.cache.json`; rules injected via `## Project Standards` from `openspec/config.yaml`).
+
+## Scope of this batch
+
+- **Phase 6: WU5 — docs, `.gitignore`, final verification** (tasks 6.1–6.3): gitignore the
+  derived atlas cache, document the atlas-as-derived-cache inversion in the shared persistence
+  contract, and run the final full-suite regression with the `parseAtlas` byte-identical check.
+
+This is the FINAL apply slice. After WU5, all six phases (1–6 / WU1–WU5) are complete.
+
+## Per-task status (WU5)
+
+### Phase 6 — WU5
+
+- [x] 6.1 `.gitignore` — added `openspec/workspace.yaml` under a Spanish comment block explaining it is a regenerable derived cache (markers are the truth). `git check-ignore -v` confirms the rule matches; `git ls-files openspec/workspace.yaml` is empty (not tracked) — satisfies the `Atlas is gitignored` spec scenario (`git status` must not show the file).
+- [x] 6.2 `skills/_shared/persistence-contract.md` — added an `### Atlas as Derived Cache (C1 marker inversion)` subsection inside the Workspace Federation section: markers (`openspec/federation.member.yaml`) are the sole source of truth; `openspec/workspace.yaml` is a gitignored, regenerable cache; valid cache is trusted; absent (ENOENT) or corrupt → regenerate from markers (`scanMemberMarkers` → `mergeMarkersIntoAtlas` → `serializeAtlas`); `git ls-files` warn-on-detect when tracked (fail-open, instructs manual `git rm --cached openspec/workspace.yaml`); C1 never executes a destructive/automatic git op.
+- [x] 6.3 Full `npm test` green (`All checks passed.`); full native suite `353/353`; `git diff scripts/lib/workspace-atlas.js` empty for WU5 (the file is untouched this batch — `parseAtlas` remains byte-identical to its WU1-committed state, which itself was `525` additions / `0` deletions over the pre-C1 baseline).
+
+## TDD note (documentation/config-contract deliverable)
+
+WU5 changes no executable code — the deliverable is a gitignore rule plus a documented
+contract in `persistence-contract.md`. Following the repo's existing markdown/config
+content-contract test pattern (`scripts/docs-lint.test.js`, `scripts/manifest-sync.test.js`,
+`scripts/sdd-init-federation.test.js`), the contract was pinned with a new `node --test` file
+`scripts/federation-derived-cache.test.js` that asserts the required tokens in `.gitignore`
+and `persistence-contract.md`. Tests were written RED-first against the not-yet-applied
+contract, giving the verify phase an executable gate for the WU5 behavior.
+
+## Test evidence (WU5)
+
+| Run | Command | Result |
+|-----|---------|--------|
+| RED gate | `node --test scripts/federation-derived-cache.test.js` (test present, contract absent) | `0 pass / 7 fail` |
+| GREEN | same, after `.gitignore` + `persistence-contract.md` edits | `7 pass / 0 fail / 0 skipped` |
+| Gitignore proof | `git check-ignore -v openspec/workspace.yaml` + `git ls-files openspec/workspace.yaml` | rule `​.gitignore:9` matches; `ls-files` empty (not tracked) |
+| Full suite (6.3) | `npm test` (`node scripts/check.js`) | `All checks passed.` (4 targets generate + validate; `0 errors, 0 warnings`) |
+| Full native suite | `node --test scripts/**/*.test.js` | `353 pass / 0 fail / 0 skipped` (346 WU1–WU4 baseline + 7 WU5) |
+| Scope check | `git status --short` | only `.gitignore`, `persistence-contract.md`, `federation-derived-cache.test.js` |
+
+> The known WU1 `git` integration flake in `artifact-store.test.js` did NOT appear this run
+> (full native suite `353/353` clean). It is outside WU5 scope; if it ever surfaces, re-run to
+> confirm it is the pre-existing flake, not a WU5 regression.
+
+## TDD Cycle Evidence (WU5)
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 6.1 `.gitignore` derived cache | `federation-derived-cache.test.js` | Unit (content contract) | N/A (new test file) | ✅ Written | ✅ Passed | ➖ Single rule assertion | ➖ Config only |
+| 6.2 `persistence-contract.md` inversion | `federation-derived-cache.test.js` | Unit (content contract) | N/A (new test file) | ✅ Written | ✅ Passed | ✅ 6 cases (derived-cache / markers-as-truth / regenerable+valid-trusted / absent+corrupt→regenerate / git ls-files warn-on-detect / no destructive git op) | ➖ Prose only |
+
+### Test Summary (WU5)
+
+- Total new tests written: 7 (all in `scripts/federation-derived-cache.test.js`)
+- Total tests passing (full native suite): 353 (346 WU1–WU4 baseline + 7 WU5)
+- Layers used: Unit / content-contract (7)
+- Approval tests (refactoring): None — WU5 only adds a gitignore rule + a doc subsection + a new test; no existing test modified
+- Pure functions created: None — WU5 is a documentation/config-contract deliverable (no executable code)
+
+## Files touched (WU5)
+
+| File | Action | What was done |
+|------|--------|---------------|
+| `.gitignore` | Modified (additive) | Added `openspec/workspace.yaml` (with an explanatory comment) so the derived atlas cache is never committed. Satisfies the `Atlas is gitignored` spec scenario. |
+| `skills/_shared/persistence-contract.md` | Modified (additive) | Added `### Atlas as Derived Cache (C1 marker inversion)` documenting markers-as-truth, the regenerable cache, valid-cache-trusted, absent/corrupt→regenerate, `git ls-files` warn-on-detect, and the no-destructive-git-op rule. Existing sections untouched. |
+| `scripts/federation-derived-cache.test.js` | Created | 7 RED-first content-contract tests pinning the WU5 gitignore rule and the persistence-contract inversion tokens. |
+| `openspec/changes/federation-distributed-markers/tasks.md` | Modified | Phase 6 (6.1–6.3) checked off `[x]` — ALL phase tasks now complete. |
+| `openspec/changes/federation-distributed-markers/state.yaml` | Modified | `WU5.status: done` (phases `[Phase 6]`); chain slice WU5 `done`; `chain.delivered: true`; `apply.status: done`; top-level `status: ready-for-verify`. |
+| `openspec/changes/federation-distributed-markers/apply-progress.md` | Modified | Appended this WU5 section; WU1 + WU2 + WU3 + WU4 history preserved verbatim. |
+
+## Suggested work-unit commit (WU5)
+
+Not committed/pushed (left staged-ready for the maintainer). Suggested single work-unit commit grouping the WU5 contract test + the gitignore rule + the doc edit:
+
+```
+feat(federation): cache derivado del atlas en gitignore y contrato de persistencia
+
+Anade openspec/workspace.yaml a .gitignore como cache derivado y regenerable (la verdad son
+los marcadores openspec/federation.member.yaml de cada repo miembro, nunca se versiona el
+atlas) y documenta en skills/_shared/persistence-contract.md la inversion atlas-como-cache:
+los marcadores son la unica fuente de verdad; el cache valido se confia; ausente (ENOENT) o
+corrupto -> se regenera desde los marcadores (scanMemberMarkers + mergeMarkersIntoAtlas +
+serializeAtlas); git ls-files emite un aviso warn-on-detect si el cache esta versionado
+(fail-open, instruye git rm --cached manual) y C1 nunca ejecuta una operacion git destructiva
+o automatica. Fija el contrato con scripts/federation-derived-cache.test.js (7 tests de
+contenido RED-first). Cobertura TDD: 7 tests nuevos; suite completa 353/353 en verde.
+```
+
+## Deviations from design (WU5)
+
+None blocking. Implementation notes:
+- **Contract-as-tests for a docs/config deliverable**: WU5 has no executable code, so strict
+  TDD was honored by writing `scripts/federation-derived-cache.test.js` RED-first, asserting
+  the required tokens in `.gitignore` and `persistence-contract.md`. This mirrors the repo's
+  established content-contract tests and gives verify an executable gate.
+- **Orchestrator note already delivered in WU4**: task 6.x text and the chain slice mention an
+  "orchestrator note", but the `agents/sdd-orchestrator.agent.md` Workspace Federation section
+  (markers-as-truth, atlas-as-derived-cache, explore-as-front-door, D11 informational note) was
+  already added in WU4 (task 5.4) and is committed at `fda2c5e`. WU5 therefore does not re-touch
+  that file; the orchestrator-facing documentation requirement is satisfied by the existing WU4
+  edit, and the shared persistence contract (6.2) is the WU5-specific docs surface.
+
+## Apply-phase final summary (WU1–WU5 complete)
+
+The C1 apply phase is **fully delivered** across the Feature Branch Chain:
+
+| WU | Phase(s) | Commit | Deliverable | New tests |
+|----|----------|--------|-------------|-----------|
+| WU1 | 1–2 | `4efe753` | `workspace-atlas.js` marker read/merge/serialize + `loadAtlas` regeneration | 19 |
+| WU2 | 3 | `f30ab07` | `federation-marker.js` idempotent atomic `enroll` | 9 |
+| WU3 | 4 | `06462da` | `sdd-init` container detection + `target_dir` (docs contract) | 10 |
+| WU4 | 5 | `fda2c5e` | `sdd-workspace` `enroll` + `explore`/`classify` subcommand | 9 |
+| WU5 | 6 | (staged) | `.gitignore` + `persistence-contract.md` derived-cache contract | 7 |
+
+- **Total tests**: `353 pass / 0 fail / 0 skipped` (full native suite); `npm test` → `All checks passed.`
+- **All tasks checked**: every Phase 1–6 task in `tasks.md` is `[x]`.
+- **Additive guarantee held**: `parseAtlas` byte-identical to pre-C1 baseline; the 6 federated
+  `artifact-store.test.js` cases and all original `workspace-atlas.test.js` cases unmodified.
+- **State**: `apply.status: done`, `chain.delivered: true`, top-level `status: ready-for-verify`.
+
+### Residual risks for the verify phase
+
+- **WU1 `git` integration flake** (`artifact-store.test.js`, real `git init`/`add` fixture):
+  observed once during WU2 as a single transient `fail 1` that did not reproduce. Did NOT appear
+  in WU5 (`353/353`). If verify sees it, re-run to confirm it is the pre-existing flake, not a
+  regression.
+- **No committed `dist/`**: `agents/*.agent.md` + `skills/**` are the source of truth; the 4-target
+  generators run inside `npm test` and validate the edits (`0 errors, 0 warnings`). There is no
+  committed generated output to diff.
+- **Markers written by `enroll` are out-of-repo side effects** (in member repos), not in this
+  single-repo tree. Single-PR rollback = revert the merge; manual cleanup = delete each member's
+  `openspec/federation.member.yaml` and un-gitignore the cache (documented in design Migration).
+
+**Next recommended**: `sdd-verify` — the apply phase is complete; all WUs delivered and staged-ready.

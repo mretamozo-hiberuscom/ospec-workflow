@@ -51,6 +51,30 @@ but MUST NOT write into a member repo; `changeDirectory`/`writeSessionSummary`/`
 stay coordinator-local, and the derived `.ospec/` surface stays in the coordinator
 workspace. Slices are authored inside each member with the normal single-repo workflow.
 
+### Atlas as Derived Cache (C1 marker inversion)
+
+C1 inverts the federation source-of-truth contract. The distributed markers
+`openspec/federation.member.yaml` in each member repo are the **sole source of truth**;
+`openspec/workspace.yaml` (the atlas) is demoted to a **derived, regenerable cache**. The
+cache is gitignored and MUST NOT be committed as a canonical artifact — it is rebuilt from
+the markers on demand.
+
+Atlas load contract (realized in `scripts/lib/artifact-store.js` `loadAtlas`):
+
+- **Valid cache is trusted.** A `workspace.yaml` that parses to a usable atlas is used as-is
+  (the federated happy path is unchanged); `sdd-workspace explore` is responsible for
+  refreshing it after `enroll`.
+- **Absent or corrupt → regenerate.** When `workspace.yaml` is missing (ENOENT) or fails to
+  parse (corrupt/unparseable), the loader regenerates the atlas from the available member
+  markers (`scanMemberMarkers` → `mergeMarkersIntoAtlas` → `serializeAtlas`), writes the
+  rebuilt cache, and emits a warning before proceeding when the prior cache was corrupt.
+- **Warn-on-detect when git-tracked.** On every load the system runs
+  `git ls-files openspec/workspace.yaml` (fail-open if git is absent). If the result is
+  non-empty the file is tracked, so it emits a warn-on-detect warning instructing the user to
+  run `git rm --cached openspec/workspace.yaml` manually, then continues loading normally.
+- **No destructive git ops.** C1 MUST NOT execute `git rm --cached` or any other destructive
+  or automatic git operation; cache migration is always manual.
+
 ## Behavior Per Mode
 
 | Mode | Read from | Write to | Project files |

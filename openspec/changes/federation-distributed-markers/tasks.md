@@ -133,6 +133,6 @@ Chain strategy: pending
 
 ## Phase 6: WU5 — Docs, .gitignore, and Final Verification
 
-- [ ] 6.1 Add `openspec/workspace.yaml` to `.gitignore`.
-- [ ] 6.2 Modify `skills/_shared/persistence-contract.md`: add a section for the atlas-as-derived-cache inversion — markers (`openspec/federation.member.yaml` in member repos) are the sole source of truth; `openspec/workspace.yaml` is a regenerable cache; valid cache is trusted; absent or corrupt → regenerate; `git ls-files` warn-on-detect if tracked; C1 never executes `git rm --cached` or any destructive git operation automatically.
-- [ ] 6.3 [NO-REGRESSION] Run full `npm test` suite — all phases green. Inspect `git diff scripts/lib/workspace-atlas.js` and confirm `parseAtlas` function body is byte-identical to pre-C1 baseline (only additive changes below the existing `module.exports` line are expected).
+- [x] 6.1 Add `openspec/workspace.yaml` to `.gitignore`.
+- [x] 6.2 Modify `skills/_shared/persistence-contract.md`: add a section for the atlas-as-derived-cache inversion — markers (`openspec/federation.member.yaml` in member repos) are the sole source of truth; `openspec/workspace.yaml` is a regenerable cache; valid cache is trusted; absent or corrupt → regenerate; `git ls-files` warn-on-detect if tracked; C1 never executes `git rm --cached` or any destructive git operation automatically.
+- [x] 6.3 [NO-REGRESSION] Run full `npm test` suite — all phases green. Inspect `git diff scripts/lib/workspace-atlas.js` and confirm `parseAtlas` function body is byte-identical to pre-C1 baseline (only additive changes below the existing `module.exports` line are expected).
