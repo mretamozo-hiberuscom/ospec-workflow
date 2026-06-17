@@ -25,7 +25,7 @@ session:
   reply_language: es
 
 status: applying
-last_updated: 2026-06-17T00:00:00Z
+last_updated: 2026-06-17T12:00:00Z
 
 route:
   intended_route: standard
@@ -86,7 +86,9 @@ phases:
       WU1:
         status: done
         phases: ["Phase 1", "Phase 2"]
-      WU2: { status: pending }
+      WU2:
+        status: done
+        phases: ["Phase 3"]
       WU3: { status: pending }
       WU4: { status: pending }
       WU5: { status: pending }
@@ -134,7 +136,7 @@ chain:
     - id: WU2
       scope: federation-marker.js enroll (idempotent, atomic)
       depends_on: [WU1]
-      status: pending
+      status: done
     - id: WU3
       scope: sdd-init container detection + target_dir via ## Parameters
       depends_on: [WU1]

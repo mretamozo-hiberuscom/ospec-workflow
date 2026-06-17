@@ -104,9 +104,94 @@ None blocking. Implementation notes:
 
 ## Remaining work (NOT in this batch)
 
-- [ ] WU2 (Phase 3) — `scripts/lib/federation-marker.js` `parseMarker`/`serializeMarker`/`enroll`.
 - [ ] WU3 (Phase 4) — `sdd-init` container detection + `target_dir`.
 - [ ] WU4 (Phase 5) — `sdd-workspace` `enroll` + `explore`/`classify` subcommand.
 - [ ] WU5 (Phase 6) — `.gitignore`, `persistence-contract.md`, orchestrator note + final verification.
 
-**Next recommended**: run WU2 — `federation-marker.js enroll` (depends on WU1 `serializeAtlas` conventions).
+**Next recommended**: run WU3 — `sdd-init` container detection + `target_dir` (independent of WU2; depends only on WU1).
+
+---
+
+# WU2 — `federation-marker.js` (Enroll)
+
+**Batch**: WU2 (Phase 3) — built on top of WU1 (committed on `feat/federation-distributed-markers`, commit `4efe753`).
+**Mode**: Strict TDD (strict_tdd: true, runner `npm test` → `node --test scripts/**/*.test.js`)
+**Delivery**: Feature Branch Chain (approval `review-workload-001`) — this batch = **WU2**, child PR on top of WU1's branch.
+**Skill resolution**: fallback-config (no `.ospec/cache/skill-registry.cache.json`; rules injected via `## Project Standards` from `openspec/config.yaml`).
+
+## Scope of this batch
+
+- **Phase 3: WU2 — `scripts/lib/federation-marker.js`** (tasks 3.1–3.4): new write-only module with `parseMarker`, `serializeMarker`, and idempotent atomic `enroll`.
+
+Phases 4–6 (WU3–WU5) are **NOT** implemented in this batch and remain pending.
+
+## Per-task status (WU2)
+
+### Phase 3 — WU2
+
+- [x] 3.1 RED tests in new `scripts/lib/federation-marker.test.js`: enroll first-write (all fields + fresh UTC `updated_at`); idempotent no-refresh (byte-stable); key-order-insensitive idempotency; change-refresh (role flip → new `updated_at`); `parseMarker`/`serializeMarker` round-trip (incl. `provides[]` `{id, consumers, surface}` + empty consumers); openspec dir auto-create; no leftover `.tmp`.
+- [x] 3.2 `parseMarker(content)` + `serializeMarker(data)` implemented (dependency-free YAML subset; `provides`/`roster` as inline-map list items; `updated_at` serialized last). Round-trips with the WU1 marker format.
+- [x] 3.3 `enroll(memberDir, data)` implemented: `mkdir -p {memberDir}/openspec`; reads+parses existing marker; strips `updated_at` from both sides and compares via `util.isDeepStrictEqual` (order-insensitive normalized comparison); identical → `{status:'fresh', path, updated_at}` (no write, timestamp preserved); changed → `updated_at = new Date().toISOString()`, serialize, atomic `.tmp`+`fs.rename` → `{status:'written', path, updated_at}`.
+- [x] 3.4 Full `npm test` green; WU1 baseline + WU2 tests all pass.
+
+## Test evidence (WU2)
+
+| Run | Command | Result |
+|-----|---------|--------|
+| RED gate | `node --test scripts/lib/federation-marker.test.js` (test file present, module absent) | `0 pass / 1 fail` (module `./federation-marker.js` cannot be required) |
+| GREEN | `node --test scripts/lib/federation-marker.test.js` (after impl) | `9 pass / 0 fail / 0 skipped` |
+| Determinism | same file ×5 consecutive runs | `9 pass / 0 fail` every run (no flake) |
+| Full suite (3.4) | `npm test` | `All checks passed.` |
+| Full native suite | `node --test scripts/**/*.test.js` | `327 pass / 0 fail / 0 skipped` (318 WU1 baseline + 9 WU2) |
+
+> Note: one transient `fail 1` was observed in a single full-suite run and did NOT reproduce (subsequent runs `327/327`). It originated in a WU1 integration test (real `git` fixture in `artifact-store.test.js`), outside WU2 scope; the WU2 file is deterministic across 5 isolated runs.
+
+## TDD Cycle Evidence (WU2)
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 3.2 `parseMarker`/`serializeMarker` | `federation-marker.test.js` | Unit | N/A (new) | ✅ Written | ✅ Passed | ✅ 3 cases (full round-trip / provides+empty-consumers / updated_at-last) | ➖ Clean as written |
+| 3.3 `enroll` first-write | `federation-marker.test.js` | Unit (fs fixtures) | N/A (new) | ✅ Written | ✅ Passed | ✅ first-write + openspec-autocreate + no-leftover-tmp | ➖ Clean as written |
+| 3.3 `enroll` idempotency | `federation-marker.test.js` | Unit (fs fixtures) | N/A (new) | ✅ Written | ✅ Passed | ✅ identical-data + key-order-insensitive | ✅ Normalized via `isDeepStrictEqual` |
+| 3.3 `enroll` change-refresh | `federation-marker.test.js` | Unit (fs fixtures) | N/A (new) | ✅ Written | ✅ Passed | ➖ role-flip single | ➖ Clean as written |
+
+### Test Summary (WU2)
+
+- Total new tests written: 9 (all in `scripts/lib/federation-marker.test.js`)
+- Total tests passing (full native suite): 327 (318 WU1 baseline + 9 WU2)
+- Layers used: Unit (9)
+- Approval tests (refactoring): None — WU2 is a brand-new file; no existing code modified
+- Pure functions created: `parseMarker`, `serializeMarker` (+ helpers); `enroll` is I/O-bound by necessity (atomic write)
+
+## Files touched (WU2)
+
+| File | Action | What was done |
+|------|--------|---------------|
+| `scripts/lib/federation-marker.js` | Created | New write-only module: dependency-free `parseMarker`/`serializeMarker` (YAML subset, `updated_at` last) + idempotent atomic `enroll` (content-minus-timestamp comparison via `isDeepStrictEqual`, `.tmp`+`rename`). |
+| `scripts/lib/federation-marker.test.js` | Created | 9 unit tests (RED-first) covering round-trip, first-write timestamping, idempotency (incl. key-order insensitivity), change-refresh, openspec auto-create, no leftover `.tmp`. |
+| `openspec/changes/federation-distributed-markers/tasks.md` | Modified | Phase 3 (3.1–3.4) checked off `[x]`. |
+| `openspec/changes/federation-distributed-markers/state.yaml` | Modified | `WU2.status: done` (phases `[Phase 3]`); chain slice WU2 `done`; apply stays `partial`, top-level `applying`. |
+| `openspec/changes/federation-distributed-markers/apply-progress.md` | Modified | Appended this WU2 section; WU1 history preserved verbatim. |
+
+## Suggested work-unit commit (WU2)
+
+Not committed/pushed (left staged-ready for the maintainer). Suggested single work-unit commit grouping WU2 tests + implementation:
+
+```
+feat(federation): anade marcador federation-marker con enroll idempotente y atomico
+
+Crea scripts/lib/federation-marker.js con parseMarker/serializeMarker (subconjunto
+YAML sin dependencias, updated_at como ultimo campo, provides/roster como mapas en
+linea) y enroll(memberDir, data): asegura openspec/, compara el contenido sin
+timestamp via isDeepStrictEqual y, si es identico, devuelve status fresh sin reescribir
+(updated_at byte-estable); ante cambio, refresca updated_at y escribe de forma atomica
+(.tmp + rename). Respeta las convenciones de serializeAtlas de WU1. Cobertura TDD: 9
+tests nuevos; suite completa 327/327 en verde.
+```
+
+## Deviations from design (WU2)
+
+None blocking. Implementation notes:
+- **Normalized idempotency comparison**: the design says "deep-equality of the stripped objects". Implemented with `node:util.isDeepStrictEqual` after stripping `updated_at` from both the parsed existing marker and the incoming data. This is order-insensitive (a caller supplying `member` keys in a different order still resolves to `status:'fresh'`), which is stricter/safer than a raw string comparison and is covered by a dedicated triangulation test.
+- **Corrupt existing marker**: if an existing `federation.member.yaml` is present but unparseable, `enroll` treats it as absent and rewrites cleanly (fail-safe), rather than aborting. This keeps `enroll` resilient and aligns with the federation fail-open posture; it is not contradicted by any spec scenario.
+- **Module self-contained**: `parseMarker`/serializer helpers are reimplemented inside `federation-marker.js` rather than imported from `workspace-atlas.js`, per the design decision to keep the member-repo WRITE path separate from the hook-facing READ/aggregation module (`workspace-atlas.js` does not export `parseMarker`). Both share the same YAML-subset conventions so markers round-trip across modules.
