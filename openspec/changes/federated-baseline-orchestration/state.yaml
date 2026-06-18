@@ -1,0 +1,126 @@
+change: federated-baseline-orchestration
+program: federation (C2)
+depends_on:
+  - federation-distributed-markers   # C1 (archived 2026-06-18)
+created_at: "2026-06-18"
+branch: feat/federated-baseline-orchestration
+
+classification: high-risk
+classification_confidence: deterministic
+classification_rationale: >
+  Orchestrator-level behavior change that delegates sdd-baseline per brownfield
+  member repo (resumable). Touches federation orchestration, cross-repo loops,
+  and persisted state contracts. Not trivial/small.
+
+route:
+  intended_route: standard
+  actual_route: standard
+  route_rationale: >
+    artifact_store.backend is 'openspec' (not workspace-federated), so the
+    'federated' route condition does not match. project.status is 'active' and
+    baseline.status is 'done', so 'brownfield' does not match. First matching
+    route for classification high-risk with project.status: active is 'standard'.
+  validated: true
+  validation_errors: []
+
+session:
+  execution_mode: auto
+  delivery_strategy: exception-ok
+  reply_language: es
+
+phases:
+  explore:
+    status: done
+    artifact: "openspec/changes/federated-baseline-orchestration/exploration.md"
+    completed_at: "2026-06-18T12:00:00Z"
+  propose:
+    status: done
+    artifact: "openspec/changes/federated-baseline-orchestration/proposal.md"
+    completed_at: "2026-06-18T13:00:00Z"
+  spec:
+    status: done
+    artifacts:
+      - openspec/changes/federated-baseline-orchestration/specs/federated-baseline-orchestration/spec.md
+      - openspec/changes/federated-baseline-orchestration/specs/unified-baseline-gate/spec.md
+      - openspec/changes/federated-baseline-orchestration/specs/sdd-baseline-federation-contract/spec.md
+      - openspec/changes/federated-baseline-orchestration/specs/marker-hygiene/spec.md
+      - openspec/changes/federated-baseline-orchestration/specs/explore-transactional-barrier/spec.md
+    completed_at: "2026-06-18T14:00:00Z"
+  clarify:
+    status: done
+    questions_asked: 1
+    inline_resolutions: 3
+    encoded_defaults:
+      - stuck-partial-guard        # progress-based re-delegation termination
+      - windows-bak-recovery       # orphaned .bak restore on startup
+      - sequential-no-race         # concurrency deferred to v2
+    user_resolved:
+      - id: coordinator-root-resolution
+        decision: explicit-coordinator-root-param
+        spec: openspec/changes/federated-baseline-orchestration/specs/sdd-baseline-federation-contract/spec.md
+    last_updated: "2026-06-18T16:00:00Z"
+  design:
+    status: done
+    artifact: "openspec/changes/federated-baseline-orchestration/design.md"
+    completed_at: "2026-06-18T17:00:00Z"
+  tasks:
+    status: done
+    artifact: "openspec/changes/federated-baseline-orchestration/tasks.md"
+    completed_at: "2026-06-18T18:00:00Z"
+  apply:
+    status: pending
+  verify:
+    status: pending
+  archive:
+    status: pending
+
+gates:
+  clarify:
+    status: done
+    questions_asked: 1
+    inline_resolutions: 3
+  4r-review-gate:
+    status: pending
+
+approvals:
+  - id: execution-mode-001
+    gate: execution-mode
+    decision: auto
+    source: vscode/askQuestions
+    accepted_at: "2026-06-18"
+    applies_to:
+      - orchestrator
+  - id: delivery-strategy-001
+    gate: delivery-strategy
+    decision: exception-ok
+    source: vscode/askQuestions
+    accepted_at: "2026-06-18"
+    applies_to:
+      - sdd-tasks
+      - sdd-apply
+  - id: arch-decisions-001
+    gate: explore-architecture
+    source: vscode/askQuestions
+    accepted_at: "2026-06-18"
+    applies_to:
+      - sdd-propose
+      - sdd-spec
+      - sdd-design
+      - sdd-tasks
+  - id: coordinator-root-001
+    gate: clarify
+    decision: explicit-coordinator-root-param
+    source: vscode/askQuestions
+    accepted_at: "2026-06-18"
+    applies_to:
+      - sdd-design
+      - sdd-tasks
+      - sdd-apply
+
+decisions:
+  state_architecture: aggregated   # Opción 1: federation-baseline-status.yaml + sequential per-member
+  batch0_gate_scope: unified        # single domain-map approval for all brownfield members
+  baseline_specs_location: member-local   # {member}/openspec/specs/ via delegated sdd-baseline
+  member_failure_policy: continue-log-retry   # mark pending, warn, continue others, manual retry
+  parallelization: sequential       # v1 sequential per-member (default, non-contested)
+  c2_scope: orchestration+hardening-s1-s3   # includes inherited C1 hardening S1/S3
