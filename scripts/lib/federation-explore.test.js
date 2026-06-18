@@ -434,3 +434,121 @@ test("explore never enrolls or writes through a symlinked member that escapes th
   assert.equal(result.status, "success");
   assert.ok(result.warnings.some((w) => /escape|symlink/i.test(w)));
 });
+
+// --- S3: explore atomic writes (temp+rename) and integration ----------------
+
+test("3.1.1 · workspace.yaml written via temp+rename", async (t) => {
+  const root = await makeContainer(t);
+  await makeMember(root, "svc-api", {
+    files: { "package.json": '{ "name": "svc-api" }\n' },
+  });
+
+  const originalRename = fs.rename;
+  let renamedWorkspaceYaml = false;
+  fs.rename = async (oldPath, newPath) => {
+    if (newPath.endsWith("workspace.yaml") && oldPath.endsWith("workspace.yaml.tmp")) {
+      renamedWorkspaceYaml = true;
+    }
+    return originalRename(oldPath, newPath);
+  };
+
+  try {
+    await explore(root);
+    assert.ok(renamedWorkspaceYaml, "workspace.yaml must be written via rename");
+    const existsTmp = await exists(path.join(root, "openspec", "workspace.yaml.tmp"));
+    assert.equal(existsTmp, false);
+  } finally {
+    fs.rename = originalRename;
+  }
+});
+
+test("3.1.2 · workspace-map.md written via temp+rename", async (t) => {
+  const root = await makeContainer(t);
+  await makeMember(root, "svc-api", {
+    files: { "package.json": '{ "name": "svc-api" }\n' },
+  });
+
+  const originalRename = fs.rename;
+  let renamedWorkspaceMap = false;
+  fs.rename = async (oldPath, newPath) => {
+    if (newPath.endsWith("workspace-map.md") && oldPath.endsWith("workspace-map.md.tmp")) {
+      renamedWorkspaceMap = true;
+    }
+    return originalRename(oldPath, newPath);
+  };
+
+  try {
+    await explore(root);
+    assert.ok(renamedWorkspaceMap, "workspace-map.md must be written via rename");
+    const existsTmp = await exists(path.join(root, "openspec", "workspace-map.md.tmp"));
+    assert.equal(existsTmp, false);
+  } finally {
+    fs.rename = originalRename;
+  }
+});
+
+test("3.1.3 · workspace-map.md write fails after workspace.yaml succeeds", async (t) => {
+  const root = await makeContainer(t);
+  await makeMember(root, "svc-api", {
+    files: { "package.json": '{ "name": "svc-api" }\n' },
+  });
+
+  const openspecDir = path.join(root, "openspec");
+  await fs.mkdir(openspecDir, { recursive: true });
+  await fs.writeFile(path.join(openspecDir, "workspace-map.md"), "original map content");
+
+  const originalWriteFile = fs.writeFile;
+  fs.writeFile = async (file, data, ...rest) => {
+    if (String(file).endsWith("workspace-map.md.tmp")) {
+      const err = new Error("ENOSPC: no space left on device");
+      err.code = "ENOSPC";
+      throw err;
+    }
+    return originalWriteFile(file, data, ...rest);
+  };
+
+  try {
+    const result = await explore(root);
+    assert.equal(await exists(path.join(openspecDir, "workspace.yaml")), true);
+    assert.equal(await fs.readFile(path.join(openspecDir, "workspace-map.md"), "utf8"), "original map content");
+    assert.ok(result.warnings.some(w => w.includes("workspace-map.md")));
+  } finally {
+    fs.writeFile = originalWriteFile;
+  }
+});
+
+test("3.1.4 · Stale workspace-map.md.tmp detected and overwritten", async (t) => {
+  const root = await makeContainer(t);
+  await makeMember(root, "svc-api", {
+    files: { "package.json": '{ "name": "svc-api" }\n' },
+  });
+
+  const openspecDir = path.join(root, "openspec");
+  await fs.mkdir(openspecDir, { recursive: true });
+  const tmpPath = path.join(openspecDir, "workspace-map.md.tmp");
+  await fs.writeFile(tmpPath, "stale content");
+
+  const result = await explore(root);
+  assert.equal(result.status, "success");
+  assert.equal(await exists(tmpPath), false);
+  assert.equal(await exists(path.join(openspecDir, "workspace-map.md")), true);
+});
+
+test("3.1.5 · explore integration S1 + S3: brownfield member marker has origin: explore and files are atomic", async (t) => {
+  const root = await makeContainer(t);
+  await makeMember(root, "svc-api", {
+    files: {
+      "package.json": '{ "name": "svc-api" }\n',
+      "src/index.js": "module.exports = {};\n",
+    },
+  });
+
+  const result = await explore(root);
+  assert.equal(result.status, "success");
+
+  const marker = await readMarker(path.join(root, "svc-api"));
+  assert.equal(marker.origin, "explore");
+
+  assert.equal(await exists(path.join(root, "openspec", "workspace.yaml")), true);
+  assert.equal(await exists(path.join(root, "openspec", "workspace-map.md")), true);
+});

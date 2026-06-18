@@ -371,6 +371,23 @@ cache and `openspec/workspace-map.md`. A per-member enroll failure is recorded a
 > and the explore phase; do not assume a coordinator repo exists yet.
 
 
+### Federation Baseline Loop
+
+When orchestrating baseline federation, the agent executes the loop using the `federation-baseline-orchestrator` library (which acts as the decision core, while the agent serves as the effect layer):
+
+1. **Candidate Selection**: Derive the candidates using `selectCandidates` with a probe of `brownfield && !initDone` verified directly on the filesystem (never from the cached marker).
+2. **Unified Gate**: Scan the fresh domain-maps of all candidates. If `unified_gate.status` is not `'approved'`, present a single unified gate to the user via `vscode/askQuestions`. Once approved, record the approval atomically in `federation-baseline-status.yaml`.
+3. **Sequential Iteration**: Iterate candidates in deterministic order (atlas order, tie-broken by `member.id` ascending):
+   - If `done` -> skip.
+   - If `partial` -> re-delegate only if there is forward progress.
+   - If `pending` and gate approved -> delegate.
+   - If `failed` -> skip, unless `--retry-failed` is provided.
+4. **Delegation**: Delegate to `sdd-baseline` with the four federated parameters: `federation_member_id`, `target_dir`, `parent_change`, and `coordinator_root`.
+5. **Failure Policy**: Implement the `continue-log-retry` policy. A terminal failure of a member changes its status to `failed`, logs a warning with the error message verbatim, and allows the loop to continue with other members. The `unified_gate` is NOT invalidated.
+6. **Retry Mechanism**: The `--retry-failed` flag re-includes failed members in the iteration, but does NOT re-present the approved unified gate. Perform standard idempotency checks.
+7. **Read-and-Link Boundary (D10)**: The coordinator only reads markers/configurations as probes; it NEVER writes any files under `{member}/openspec/specs/`.
+
+
 ### Execution Mode
 
 When the user invokes `/sdd-new`, `/sdd-ff`, `/sdd-continue`, or `/sdd-lite` (or an equivalent natural-language request, e.g. "haceme un SDD para X" / "do SDD for X") for the first time in a session, use `vscode/askQuestions` to ask which execution mode they prefer:

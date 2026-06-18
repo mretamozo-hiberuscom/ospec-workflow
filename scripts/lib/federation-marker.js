@@ -373,6 +373,12 @@ async function readExistingMarker(markerPath) {
   }
 }
 
+const ORIGIN_PRECEDENCE = {
+  explore: 1,
+  init: 2,
+  manual: 3,
+};
+
 async function enroll(memberDir, data) {
   const openspecDir = path.join(memberDir, "openspec");
   const markerPath = path.join(memberDir, MARKER_RELATIVE_PATH);
@@ -381,6 +387,17 @@ async function enroll(memberDir, data) {
 
   const incoming = stripTimestamp(data);
   const existing = await readExistingMarker(markerPath);
+
+  if (existing) {
+    const existingOrigin = existing.origin || "";
+    const incomingOrigin = incoming.origin || "";
+    const existingPrec = ORIGIN_PRECEDENCE[existingOrigin] || 0;
+    const incomingPrec = ORIGIN_PRECEDENCE[incomingOrigin] || 0;
+
+    if (existingPrec > incomingPrec) {
+      incoming.origin = existing.origin;
+    }
+  }
 
   if (existing && isDeepStrictEqual(stripTimestamp(existing), incoming)) {
     return {

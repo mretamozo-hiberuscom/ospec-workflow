@@ -603,3 +603,173 @@ test("serializeAtlas round-trips through parseAtlas", () => {
 
   assert.deepEqual(parseAtlas(serializeAtlas(atlas)), atlas);
 });
+
+// --- S1: Marker Hygiene / warning suppression tests -----------------------
+
+test("2.2.1 · loadMarkerFromMember suppresses warning on origin: explore marker without remote", async (t) => {
+  const ws = await createWorkspace(t);
+  const markerContent = [
+    "origin: explore",
+    "member:",
+    "  id: svc-api",
+    "  role: primary",
+    "roster:",
+    "  - id: svc-api",
+    "updated_at: 2026-06-17T10:00:00.000Z",
+  ].join("\n");
+  const memberRoot = await writeMember(ws, "member-api", { marker: markerContent });
+
+  const result = await loadMarkerFromMember(memberRoot);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.marker.member.id, "svc-api");
+  assert.equal(result.warning, undefined);
+});
+
+test("2.2.2 · loadMarkerFromMember emits warning on origin: init marker without remote", async (t) => {
+  const ws = await createWorkspace(t);
+  const markerContent = [
+    "origin: init",
+    "member:",
+    "  id: svc-api",
+    "  role: primary",
+    "roster:",
+    "  - id: svc-api",
+    "updated_at: 2026-06-17T10:00:00.000Z",
+  ].join("\n");
+  const memberRoot = await writeMember(ws, "member-api", { marker: markerContent });
+
+  const result = await loadMarkerFromMember(memberRoot);
+
+  assert.equal(result.ok, true);
+  assert.match(result.warning, /remote/i);
+});
+
+test("2.2.3 · loadMarkerFromMember emits warning on legacy marker (origin absent) without remote", async (t) => {
+  const ws = await createWorkspace(t);
+  const markerContent = [
+    "member:",
+    "  id: svc-api",
+    "  role: primary",
+    "roster:",
+    "  - id: svc-api",
+    "updated_at: 2026-06-17T10:00:00.000Z",
+  ].join("\n");
+  const memberRoot = await writeMember(ws, "member-api", { marker: markerContent });
+
+  const result = await loadMarkerFromMember(memberRoot);
+
+  assert.equal(result.ok, true);
+  assert.match(result.warning, /remote/i);
+});
+
+test("2.2.4 · scanMemberMarkers/mergeMarkersIntoAtlas with 2 explore + 1 init markers without remote", async (t) => {
+  const ws = await createWorkspace(t);
+
+  const explore1 = [
+    "origin: explore",
+    "member:",
+    "  id: svc-explore-1",
+    "  role: primary",
+    "roster:",
+    "  - id: svc-explore-1",
+    "updated_at: 2026-06-17T10:00:00.000Z",
+  ].join("\n");
+
+  const explore2 = [
+    "origin: explore",
+    "member:",
+    "  id: svc-explore-2",
+    "  role: primary",
+    "roster:",
+    "  - id: svc-explore-2",
+    "updated_at: 2026-06-17T10:00:00.000Z",
+  ].join("\n");
+
+  const initMarker = [
+    "origin: init",
+    "member:",
+    "  id: svc-init",
+    "  role: primary",
+    "roster:",
+    "  - id: svc-init",
+    "updated_at: 2026-06-17T10:00:00.000Z",
+  ].join("\n");
+
+  await writeMember(ws, "svc-explore-1", { marker: explore1 });
+  await writeMember(ws, "svc-explore-2", { marker: explore2 });
+  await writeMember(ws, "svc-init", { marker: initMarker });
+
+  const results = await scanMemberMarkers(ws);
+  assert.equal(results.length, 3);
+
+  const byId = Object.fromEntries(results.map(r => [r.marker.member.id, r]));
+
+  assert.equal(byId["svc-explore-1"].warning, undefined);
+  assert.equal(byId["svc-explore-2"].warning, undefined);
+  assert.match(byId["svc-init"].warning, /remote/i);
+
+  // When merged:
+  const markers = results.map(r => r.marker);
+  const { atlas } = mergeMarkersIntoAtlas(markers);
+  assert.equal(atlas.members.length, 3);
+  assert.deepEqual(atlas.members.map(m => m.id).sort(), ["svc-explore-1", "svc-explore-2", "svc-init"]);
+});
+
+test("2.2.5 · mergeMarkersIntoAtlas suppresses roster warning for origin: explore source", () => {
+  const markers = [
+    {
+      origin: "explore",
+      member: { id: "svc-api", role: "primary" },
+      roster: [
+        { id: "svc-shared" } // no remote
+      ],
+      updated_at: "2026-06-17T10:00:00Z"
+    }
+  ];
+
+  const { atlas, warnings } = mergeMarkersIntoAtlas(markers);
+
+  assert.equal(atlas.members.length, 2); // svc-api + svc-shared
+  // There should be NO warning about roster entry having no remote
+  const rosterWarnings = warnings.filter(w => w.includes("roster") || w.includes("remote"));
+  assert.equal(rosterWarnings.length, 0);
+});
+
+test("2.2.6 · mergeMarkersIntoAtlas emits roster warning for origin: init source", () => {
+  const markers = [
+    {
+      origin: "init",
+      member: { id: "svc-api", role: "primary" },
+      roster: [
+        { id: "svc-shared" } // no remote
+      ],
+      updated_at: "2026-06-17T10:00:00Z"
+    }
+  ];
+
+  const { atlas, warnings } = mergeMarkersIntoAtlas(markers);
+
+  assert.equal(atlas.members.length, 2); // svc-api + svc-shared
+  // Warning should be emitted
+  const rosterWarnings = warnings.filter(w => w.includes("roster") || w.includes("remote") || w.includes("no remote"));
+  assert.ok(rosterWarnings.length > 0);
+});
+
+test("2.2.7 · Old consumer ignores origin field", () => {
+  const markerContent = [
+    "origin: explore",
+    "member:",
+    "  id: svc-api",
+    "  role: primary",
+    "  remote: https://example.com/api.git",
+    "roster:",
+    "  - id: svc-api",
+    "updated_at: 2026-06-17T10:00:00.000Z",
+  ].join("\n");
+
+  const parsed = parseAtlas(markerContent);
+  // Old parseAtlas behavior should just work, it doesn't care about origin
+  assert.ok(parsed);
+});
+

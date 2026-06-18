@@ -297,3 +297,88 @@ test("enroll rewrites a present-but-unparseable marker (corrupt self-heal stays 
   );
   assert.equal(parsed.member.id, "svc-api");
 });
+
+// --- S1: Marker Hygiene / origin field tests --------------------------------
+
+test("2.1.1 · Explore enroll sets origin: explore on new marker", async (t) => {
+  const ws = await createWorkspace(t);
+  const memberDir = path.join(ws, "svc-api");
+
+  const data = buildData({ top: { origin: "explore" } });
+  const result = await enroll(memberDir, data);
+
+  assert.equal(result.status, "written");
+
+  const written = await fs.readFile(result.path, "utf8");
+  const parsed = parseMarker(written);
+  assert.equal(parsed.origin, "explore");
+});
+
+test("2.1.2 · Explore enroll does not downgrade origin: init", async (t) => {
+  const ws = await createWorkspace(t);
+  const memberDir = path.join(ws, "svc-api");
+  const oldTimestamp = "2020-01-01T00:00:00.000Z";
+
+  await fs.mkdir(path.join(memberDir, "openspec"), { recursive: true });
+  const seeded = serializeMarker({ ...buildData(), origin: "init", updated_at: oldTimestamp });
+  await fs.writeFile(path.join(memberDir, MARKER_RELATIVE_PATH), seeded);
+
+  const data = buildData({ top: { origin: "explore" } });
+  const result = await enroll(memberDir, data);
+
+  assert.equal(result.status, "fresh");
+  assert.equal(result.updated_at, oldTimestamp);
+
+  const written = await fs.readFile(path.join(memberDir, MARKER_RELATIVE_PATH), "utf8");
+  const parsed = parseMarker(written);
+  assert.equal(parsed.origin, "init");
+});
+
+test("2.1.3 · Explore enroll does not downgrade origin: manual", async (t) => {
+  const ws = await createWorkspace(t);
+  const memberDir = path.join(ws, "svc-api");
+  const oldTimestamp = "2020-01-01T00:00:00.000Z";
+
+  await fs.mkdir(path.join(memberDir, "openspec"), { recursive: true });
+  const seeded = serializeMarker({ ...buildData(), origin: "manual", updated_at: oldTimestamp });
+  await fs.writeFile(path.join(memberDir, MARKER_RELATIVE_PATH), seeded);
+
+  const data = buildData({ top: { origin: "explore" } });
+  const result = await enroll(memberDir, data);
+
+  assert.equal(result.status, "fresh");
+  assert.equal(result.updated_at, oldTimestamp);
+
+  const written = await fs.readFile(path.join(memberDir, MARKER_RELATIVE_PATH), "utf8");
+  const parsed = parseMarker(written);
+  assert.equal(parsed.origin, "manual");
+});
+
+test("2.1.4 · sdd-init enroll upgrades origin: explore to init", async (t) => {
+  const ws = await createWorkspace(t);
+  const memberDir = path.join(ws, "svc-api");
+  const oldTimestamp = "2020-01-01T00:00:00.000Z";
+
+  await fs.mkdir(path.join(memberDir, "openspec"), { recursive: true });
+  const seeded = serializeMarker({ ...buildData(), origin: "explore", updated_at: oldTimestamp });
+  await fs.writeFile(path.join(memberDir, MARKER_RELATIVE_PATH), seeded);
+
+  const data = buildData({ top: { origin: "init" } });
+  const result = await enroll(memberDir, data);
+
+  assert.equal(result.status, "written");
+  assert.ok(Date.parse(result.updated_at) > Date.parse(oldTimestamp));
+
+  const written = await fs.readFile(result.path, "utf8");
+  const parsed = parseMarker(written);
+  assert.equal(parsed.origin, "init");
+});
+
+test("2.1.5 · serializeMarker/parseMarker round-trip with origin field present", () => {
+  const data = { ...buildData(), origin: "explore", updated_at: "2026-06-17T10:00:00.000Z" };
+
+  const parsed = parseMarker(serializeMarker(data));
+
+  assert.deepEqual(parsed, data);
+});
+

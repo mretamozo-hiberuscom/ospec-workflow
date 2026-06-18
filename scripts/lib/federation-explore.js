@@ -9,6 +9,7 @@ const {
   serializeAtlas,
 } = require("./workspace-atlas.js");
 const { enroll } = require("./federation-marker.js");
+const { writeFileAtomic } = require("./atomic-write.js");
 
 // Executable backbone of the `sdd-workspace explore`/`classify` subcommand (C1,
 // WU4). It realizes the workspace-explore phase: discover container members at
@@ -194,7 +195,7 @@ function buildMemberData(containerId, memberDir, classification) {
     member.layer = classification.layer;
   }
 
-  return { federation: { id: containerId }, member };
+  return { federation: { id: containerId }, member, origin: "explore" };
 }
 
 async function explore(containerRoot) {
@@ -255,14 +256,24 @@ async function explore(containerRoot) {
   const atlasPath = path.join(openspecDir, "workspace.yaml");
   const mapPath = path.join(openspecDir, "workspace-map.md");
 
-  await fs.writeFile(atlasPath, serializeAtlas(atlas));
-  await fs.writeFile(mapPath, renderWorkspaceMap(containerId, memberRows));
+  const artifacts = [];
+  const exploreWarnings = [...scanWarnings, ...mergeWarnings];
+
+  await writeFileAtomic(atlasPath, serializeAtlas(atlas));
+  artifacts.push(atlasPath);
+
+  try {
+    await writeFileAtomic(mapPath, renderWorkspaceMap(containerId, memberRows));
+    artifacts.push(mapPath);
+  } catch (error) {
+    exploreWarnings.push(`cannot write workspace-map.md: ${error.message}`);
+  }
 
   return {
     status: "success",
     members: memberRows,
-    artifacts: [atlasPath, mapPath],
-    warnings: [...scanWarnings, ...mergeWarnings],
+    artifacts,
+    warnings: exploreWarnings,
   };
 }
 

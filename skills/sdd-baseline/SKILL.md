@@ -91,3 +91,45 @@ source: local
 ## Output Contract
 
 Return `status`, `executive_summary`, `artifacts`, `next_recommended`, `risks`, and `skill_resolution`. If blocked at batch 0, include `question_gate` with the proposed domain map.
+
+
+## Federated Mode Invocation
+
+When baseline is invoked in federated mode, the following parameters are supplied by the orchestrator:
+
+| Parameter | Type | Obligatoriness | Description |
+|---|---|---|---|
+| `federation_member_id` | string | MUST | Activates federated mode. |
+| `target_dir` | string | MUST | The root directory of the member repository to baseline. |
+| `parent_change` | string | MUST | The name of the coordinator change directory. |
+| `coordinator_root` | string | SHOULD (always supplied by orchestrator) | The root directory of the coordinator repository. |
+
+### Write Targets in Federated Mode
+In federated mode, all local baseline artifacts must be written under the member's `target_dir` (never infer from `cwd` or coordinator root):
+- `{target_dir}/openspec/specs/_baseline/manifest.md`
+- `{target_dir}/openspec/specs/_baseline/index.md`
+- `{target_dir}/openspec/specs/{domain}/spec.md`
+- `{target_dir}/openspec/config.yaml`
+
+### Batch-0 Skip Condition
+Skip the domain-map approval gate (batch-0 skip) if both `_baseline/manifest.md` and `_baseline/config.yaml` are already present under the member's `target_dir`.
+
+### Coordinator Root Resolution Order
+After completing a domain, the aggregated state file `{coordinator_root}/openspec/changes/{parent_change}/federation-baseline-status.yaml` must be updated. Resolve `coordinator_root` as follows:
+1. Use the explicit parameter `coordinator_root` if provided.
+2. If absent, perform upward traversal from `target_dir` to find a parent directory containing `openspec/changes/{parent_change}/`.
+3. If still indeterminate, block and return `status: blocked` with `question_gate`.
+
+### Minimal Delegation Example
+```json
+{
+  "agent": "sdd-baseline",
+  "task": "Perform baseline for member svc-payments",
+  "parameters": {
+    "federation_member_id": "svc-payments",
+    "target_dir": "../svc-payments",
+    "parent_change": "federated-baseline-orchestration",
+    "coordinator_root": "../ospec-workflow"
+  }
+}
+```

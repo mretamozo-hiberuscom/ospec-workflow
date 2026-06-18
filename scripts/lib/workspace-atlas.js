@@ -405,6 +405,9 @@ async function loadMarkerFromMember(memberRoot) {
   }
 
   if (!marker.member.remote) {
+    if (marker.origin === "explore") {
+      return { ok: true, marker };
+    }
     return {
       ok: true,
       marker,
@@ -617,7 +620,7 @@ function compareUpdatedAt(left, right) {
   return String(left) < String(right) ? -1 : 1;
 }
 
-function buildMemberEntry(member) {
+function buildMemberEntry(member, origin) {
   const entry = {};
 
   for (const key of ["id", "role", "type", "layer", "remote", "path", "openspec_root"]) {
@@ -626,14 +629,22 @@ function buildMemberEntry(member) {
     }
   }
 
+  if (origin !== undefined) {
+    entry.origin = origin;
+  }
+
   return entry;
 }
 
-function buildRosterEntry(rosterMember) {
+function buildRosterEntry(rosterMember, origin) {
   const entry = { id: rosterMember.id };
 
   if (rosterMember.remote !== undefined) {
     entry.remote = rosterMember.remote;
+  }
+
+  if (origin !== undefined) {
+    entry.origin = origin;
   }
 
   return entry;
@@ -657,8 +668,8 @@ function considerCandidate(winners, warnings, id, candidate) {
   if (comparison === 0 && candidate.sourceId !== existing.sourceId) {
     const winnerSource =
       candidate.sourceId > existing.sourceId
-        ? candidate.sourceId
-        : existing.sourceId;
+         ? candidate.sourceId
+         : existing.sourceId;
 
     warnings.push(
       `equal updated_at tie for "${id}"; resolved to source member "${winnerSource}"`,
@@ -684,7 +695,7 @@ function mergeMarkersIntoAtlas(markers) {
     const updatedAt = marker.updated_at || "";
 
     considerCandidate(winners, warnings, marker.member.id, {
-      entry: buildMemberEntry(marker.member),
+      entry: buildMemberEntry(marker.member, marker.origin),
       provides: Array.isArray(marker.member.provides) ? marker.member.provides : [],
       sourceId,
       updatedAt,
@@ -695,8 +706,12 @@ function mergeMarkersIntoAtlas(markers) {
         continue;
       }
 
+      if (!rosterMember.remote && marker.origin !== "explore") {
+        warnings.push(`roster entry "${rosterMember.id}" in member "${marker.member.id}" has no remote; it is not remotely reconstructible`);
+      }
+
       considerCandidate(winners, warnings, rosterMember.id, {
-        entry: buildRosterEntry(rosterMember),
+        entry: buildRosterEntry(rosterMember, marker.origin),
         provides: [],
         sourceId,
         updatedAt,
