@@ -10,6 +10,11 @@ const {
   computeImpact,
   parseAtlas,
   resolveMembers,
+  loadMarkerFromMember,
+  scanMemberMarkers,
+  mergeMarkersIntoAtlas,
+  serializeAtlas,
+  isWithinRoot,
 } = require("./workspace-atlas.js");
 
 const SAMPLE_ATLAS = [
@@ -160,4 +165,441 @@ test("computeImpact returns only itself for a leaf member", () => {
   );
 
   assert.deepEqual([...computeImpact(atlas, "web")], ["web"]);
+});
+
+const MARKER_API = [
+  "federation:",
+  "  id: fed-001",
+  "member:",
+  "  id: svc-api",
+  "  role: primary",
+  "  type: microservicio",
+  "  layer: dominio",
+  "  remote: https://example.com/api.git",
+  "  provides:",
+  "    - { id: api-public, consumers: [svc-web], surface: openapi }",
+  "roster:",
+  "  - { id: svc-api, remote: https://example.com/api.git }",
+  "updated_at: 2026-06-17T10:00:00.000Z",
+  "",
+].join("\n");
+
+async function writeMember(containerRoot, dir, { gitAsFile = false, marker } = {}) {
+  const memberRoot = path.join(containerRoot, dir);
+
+  await fs.mkdir(memberRoot, { recursive: true });
+
+  if (gitAsFile) {
+    await fs.writeFile(
+      path.join(memberRoot, ".git"),
+      "gitdir: ../.git/worktrees/x\n",
+    );
+  } else {
+    await fs.mkdir(path.join(memberRoot, ".git"), { recursive: true });
+  }
+
+  if (marker !== undefined) {
+    await fs.mkdir(path.join(memberRoot, "openspec"), { recursive: true });
+    await fs.writeFile(
+      path.join(memberRoot, "openspec", "federation.member.yaml"),
+      marker,
+    );
+  }
+
+  return memberRoot;
+}
+
+function buildMarker({
+  id,
+  updatedAt,
+  role = "primary",
+  provides = [],
+  roster = [],
+  remote,
+}) {
+  const member = { id, role, type: "microservicio", layer: "dominio", provides };
+
+  if (remote !== undefined) {
+    member.remote = remote;
+  }
+
+  return { federation: { id: `fed-${id}` }, member, roster, updated_at: updatedAt };
+}
+
+test("loadMarkerFromMember parses a valid marker", async (t) => {
+  const ws = await createWorkspace(t);
+  const memberRoot = await writeMember(ws, "member-api", { marker: MARKER_API });
+
+  const result = await loadMarkerFromMember(memberRoot);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.marker.member.id, "svc-api");
+  assert.equal(result.marker.member.provides[0].id, "api-public");
+  assert.deepEqual(result.marker.member.provides[0].consumers, ["svc-web"]);
+  assert.equal(result.warning, undefined);
+});
+
+test("loadMarkerFromMember warns but succeeds when remote is absent", async (t) => {
+  const ws = await createWorkspace(t);
+  const marker = MARKER_API.replace(
+    "  remote: https://example.com/api.git\n",
+    "",
+  );
+  const memberRoot = await writeMember(ws, "member-api", { marker });
+
+  const result = await loadMarkerFromMember(memberRoot);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.marker.member.id, "svc-api");
+  assert.match(result.warning, /remot/i);
+});
+
+test("loadMarkerFromMember fails open when the marker is missing", async (t) => {
+  const ws = await createWorkspace(t);
+
+  const result = await loadMarkerFromMember(path.join(ws, "ghost"));
+
+  assert.equal(result.ok, false);
+  assert.ok(result.warning);
+});
+
+test("loadMarkerFromMember fails open on a malformed marker", async (t) => {
+  const ws = await createWorkspace(t);
+  const memberRoot = await writeMember(ws, "member-bad", {
+    marker: "not-a-marker: : :\n[]{}\n",
+  });
+
+  const result = await loadMarkerFromMember(memberRoot);
+
+  assert.equal(result.ok, false);
+  assert.ok(result.warning);
+});
+
+test("scanMemberMarkers detects a member whose .git is a directory", async (t) => {
+  const ws = await createWorkspace(t);
+  await writeMember(ws, "svc-api", { marker: MARKER_API });
+
+  const result = await scanMemberMarkers(ws);
+
+  assert.deepEqual(
+    result.map((entry) => entry.memberDir),
+    ["svc-api"],
+  );
+  assert.equal(result[0].marker.member.id, "svc-api");
+});
+
+test("scanMemberMarkers detects a member whose .git is a plain file", async (t) => {
+  const ws = await createWorkspace(t);
+  await writeMember(ws, "libs-ui", { gitAsFile: true, marker: MARKER_API });
+
+  const result = await scanMemberMarkers(ws);
+
+  assert.deepEqual(
+    result.map((entry) => entry.memberDir),
+    ["libs-ui"],
+  );
+});
+
+test("scanMemberMarkers unions .gitmodules paths without duplicates", async (t) => {
+  const ws = await createWorkspace(t);
+  await writeMember(ws, "services-extra", { marker: MARKER_API });
+  await fs.mkdir(path.join(ws, "libs", "shared", "openspec"), {
+    recursive: true,
+  });
+  await fs.writeFile(
+    path.join(ws, "libs", "shared", "openspec", "federation.member.yaml"),
+    MARKER_API,
+  );
+  await fs.writeFile(
+    path.join(ws, ".gitmodules"),
+    [
+      '[submodule "libs/shared"]',
+      "  path = libs/shared",
+      "  url = https://example.com/shared.git",
+      '[submodule "services-extra"]',
+      "  path = services-extra",
+      "  url = https://example.com/extra.git",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await scanMemberMarkers(ws);
+
+  assert.deepEqual(
+    result.map((entry) => entry.memberDir).sort(),
+    ["libs/shared", "services-extra"],
+  );
+});
+
+test("scanMemberMarkers returns empty with a warning for a container with no members", async (t) => {
+  const ws = await createWorkspace(t);
+
+  const result = await scanMemberMarkers(ws);
+
+  assert.equal(result.length, 0);
+  assert.ok(result.warnings.length > 0);
+});
+
+test("isWithinRoot accepts nested members and rejects traversal/absolute escapes", () => {
+  const root = path.join(path.sep, "srv", "container");
+
+  assert.equal(isWithinRoot(root, path.join(root, "svc-api")), true);
+  assert.equal(isWithinRoot(root, path.join(root, "libs", "shared")), true);
+  // Degenerate: a candidate that resolves to the container root itself is rejected.
+  assert.equal(isWithinRoot(root, root), false);
+  // Parent traversal escapes the container.
+  assert.equal(isWithinRoot(root, path.resolve(root, "..", "evil")), false);
+  // A sibling that merely shares a name prefix is NOT inside (root + path.sep guard).
+  assert.equal(isWithinRoot(root, `${root}-evil`), false);
+});
+
+test("scanMemberMarkers rejects a .gitmodules path that escapes the container root (read path)", async (t) => {
+  const ws = await createWorkspace(t);
+  // A legitimate in-root member that must still be discovered (regression).
+  await writeMember(ws, "svc-api", { marker: MARKER_API });
+
+  // Plant a marker OUTSIDE the container that a traversal path would otherwise read.
+  const outside = path.join(ws, "..", `evil-${path.basename(ws)}`);
+  await fs.mkdir(path.join(outside, "openspec"), { recursive: true });
+  await fs.writeFile(
+    path.join(outside, "openspec", "federation.member.yaml"),
+    MARKER_API,
+  );
+  t.after(() => fs.rm(outside, { recursive: true, force: true }));
+
+  await fs.writeFile(
+    path.join(ws, ".gitmodules"),
+    [
+      '[submodule "evil"]',
+      `  path = ../evil-${path.basename(ws)}`,
+      "  url = https://example.com/evil.git",
+      '[submodule "abs"]',
+      `  path = ${path.join(os.tmpdir(), "abs-escape-target")}`,
+      "  url = https://example.com/abs.git",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await scanMemberMarkers(ws);
+
+  // Only the in-root member is discovered; the escaping paths are skipped.
+  assert.deepEqual(
+    result.map((entry) => entry.memberDir),
+    ["svc-api"],
+  );
+  // No out-of-tree READ happened for the escaping members.
+  assert.ok(!result.some((entry) => String(entry.memberDir).includes("evil-")));
+  // A fail-open warning is surfaced for each rejected traversal path.
+  assert.ok(
+    result.warnings.some(
+      (w) => /escape/i.test(w) && w.includes(`../evil-${path.basename(ws)}`),
+    ),
+  );
+  assert.ok(
+    result.warnings.some(
+      (w) => /escape/i.test(w) && w.includes("abs-escape-target"),
+    ),
+  );
+});
+
+// WU7 (risk-warning-symlink-001): lexical isWithinRoot alone trusts a member
+// directory whose NAME has no `../` even when it is a real symlink physically
+// pointing OUTSIDE the container. scanMemberMarkers must resolve the real path
+// and reject such an escaping symlink (warn + skip), without out-of-tree reads.
+test("scanMemberMarkers rejects a symlinked member that escapes the container (read path)", async (t) => {
+  const ws = await createWorkspace(t);
+  // A legitimate in-root member that must still be discovered (regression).
+  await writeMember(ws, "svc-api", { marker: MARKER_API });
+
+  // A real directory OUTSIDE the container carrying a marker a symlink would expose.
+  const outside = path.join(ws, "..", `escape-${path.basename(ws)}`);
+  await fs.mkdir(path.join(outside, "openspec"), { recursive: true });
+  await fs.writeFile(
+    path.join(outside, "openspec", "federation.member.yaml"),
+    MARKER_API,
+  );
+  t.after(() => fs.rm(outside, { recursive: true, force: true }));
+
+  // Plant a symlink INSIDE the container whose name has no `../` (passes lexical).
+  const linkType = process.platform === "win32" ? "junction" : "dir";
+  try {
+    await fs.symlink(outside, path.join(ws, "legit"), linkType);
+  } catch (error) {
+    if (error.code === "EPERM" || error.code === "EACCES") {
+      t.skip("symlink creation not permitted on this platform");
+      return;
+    }
+    throw error;
+  }
+
+  await fs.writeFile(
+    path.join(ws, ".gitmodules"),
+    [
+      '[submodule "legit"]',
+      "  path = legit",
+      "  url = https://example.com/legit.git",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await scanMemberMarkers(ws);
+
+  // Only the genuine in-root member survives; the escaping symlink is rejected.
+  assert.deepEqual(
+    result.map((entry) => entry.memberDir),
+    ["svc-api"],
+  );
+  assert.ok(!result.some((entry) => entry.memberDir === "legit"));
+  // No out-of-tree READ happened through the symlink.
+  assert.ok(
+    result.warnings.some(
+      (w) => /escape|symlink/i.test(w) && w.includes("legit"),
+    ),
+  );
+});
+
+test("mergeMarkersIntoAtlas unions member entries from multiple markers", () => {
+  const { atlas } = mergeMarkersIntoAtlas([
+    buildMarker({
+      id: "svc-api",
+      updatedAt: "2026-06-17T10:00:00Z",
+      provides: [{ id: "api-public", consumers: ["svc-web"], surface: "openapi" }],
+    }),
+    buildMarker({ id: "svc-web", updatedAt: "2026-06-17T10:00:00Z" }),
+  ]);
+
+  assert.deepEqual(
+    atlas.members.map((member) => member.id).sort(),
+    ["svc-api", "svc-web"],
+  );
+  assert.deepEqual(atlas.contracts, [
+    { id: "api-public", provider: "svc-api", consumers: ["svc-web"] },
+  ]);
+});
+
+test("mergeMarkersIntoAtlas keeps the later updated_at on duplicate member.id", () => {
+  const { atlas } = mergeMarkersIntoAtlas([
+    buildMarker({
+      id: "svc-auth",
+      updatedAt: "2026-06-17T09:00:00Z",
+      role: "secondary",
+    }),
+    buildMarker({
+      id: "svc-auth",
+      updatedAt: "2026-06-17T12:00:00Z",
+      role: "primary",
+    }),
+  ]);
+
+  const auth = atlas.members.find((member) => member.id === "svc-auth");
+
+  assert.equal(atlas.members.length, 1);
+  assert.equal(auth.role, "primary");
+});
+
+test("mergeMarkersIntoAtlas breaks an updated_at tie by greater source member.id", () => {
+  const ts = "2026-06-17T10:00:00Z";
+  const { atlas, warnings } = mergeMarkersIntoAtlas([
+    buildMarker({
+      id: "svc-api",
+      updatedAt: ts,
+      roster: [{ id: "svc-gateway", remote: "https://api/gw" }],
+    }),
+    buildMarker({
+      id: "svc-web",
+      updatedAt: ts,
+      roster: [{ id: "svc-gateway", remote: "https://web/gw" }],
+    }),
+  ]);
+
+  const gateway = atlas.members.find((member) => member.id === "svc-gateway");
+
+  assert.equal(gateway.remote, "https://web/gw");
+  assert.ok(warnings.some((warning) => /tie/i.test(warning)));
+});
+
+test("mergeMarkersIntoAtlas is deterministic across re-runs", () => {
+  const input = [
+    buildMarker({
+      id: "svc-api",
+      updatedAt: "2026-06-17T10:00:00Z",
+      provides: [{ id: "c1", consumers: [], surface: "x" }],
+    }),
+    buildMarker({ id: "svc-web", updatedAt: "2026-06-17T11:00:00Z" }),
+  ];
+
+  assert.deepEqual(
+    mergeMarkersIntoAtlas(input).atlas,
+    mergeMarkersIntoAtlas(input).atlas,
+  );
+});
+
+test("mergeMarkersIntoAtlas skips a malformed marker without aborting", () => {
+  const { atlas, warnings } = mergeMarkersIntoAtlas([
+    null,
+    { member: {} },
+    buildMarker({ id: "svc-api", updatedAt: "2026-06-17T10:00:00Z" }),
+  ]);
+
+  assert.deepEqual(
+    atlas.members.map((member) => member.id),
+    ["svc-api"],
+  );
+  assert.ok(warnings.some((warning) => /malformed/i.test(warning)));
+});
+
+test("mergeMarkersIntoAtlas maps provides to contracts with provider and consumers", () => {
+  const { atlas } = mergeMarkersIntoAtlas([
+    buildMarker({
+      id: "svc-payments",
+      updatedAt: "2026-06-17T10:00:00Z",
+      provides: [
+        {
+          id: "payments-api",
+          consumers: ["svc-checkout", "svc-reporting"],
+          surface: "openapi",
+        },
+      ],
+    }),
+  ]);
+
+  assert.deepEqual(atlas.contracts, [
+    {
+      id: "payments-api",
+      provider: "svc-payments",
+      consumers: ["svc-checkout", "svc-reporting"],
+    },
+  ]);
+  assert.deepEqual(
+    [...computeImpact(atlas, "svc-payments")].sort(),
+    ["svc-checkout", "svc-payments", "svc-reporting"],
+  );
+});
+
+test("mergeMarkersIntoAtlas yields a provider-only impact set when consumers are empty", () => {
+  const { atlas } = mergeMarkersIntoAtlas([
+    buildMarker({
+      id: "svc-payments",
+      updatedAt: "2026-06-17T10:00:00Z",
+      provides: [{ id: "payments-events", consumers: [], surface: "events" }],
+    }),
+  ]);
+
+  assert.deepEqual(atlas.contracts[0].consumers, []);
+  assert.deepEqual([...computeImpact(atlas, "svc-payments")], ["svc-payments"]);
+});
+
+test("serializeAtlas round-trips through parseAtlas", () => {
+  const atlas = {
+    members: [
+      { id: "svc-api", role: "primary", type: "microservicio", layer: "dominio" },
+      { id: "svc-web", role: "secondary", type: "microfrontal", layer: "common" },
+    ],
+    contracts: [
+      { id: "api-public", provider: "svc-api", consumers: ["svc-web"] },
+      { id: "events", provider: "svc-api", consumers: [] },
+    ],
+  };
+
+  assert.deepEqual(parseAtlas(serializeAtlas(atlas)), atlas);
 });

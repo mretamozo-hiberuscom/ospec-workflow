@@ -3,6 +3,11 @@
 # no estos renders. Mantener local para evitar trazabilidad stale en git.
 .ospec/
 
+# Atlas de federación — cache derivado y regenerable. La verdad son los marcadores
+# openspec/federation.member.yaml de cada repo miembro; openspec/workspace.yaml se
+# reconstruye desde ellos y NUNCA se versiona como artefacto canónico.
+openspec/workspace.yaml
+
 # Build outputs and coverage
 dist/
 coverage/

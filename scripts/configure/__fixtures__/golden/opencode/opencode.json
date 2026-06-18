@@ -7,7 +7,10 @@
         "npx",
         "@upstash/context7-mcp@1.0.31"
       ],
-      "enabled": true
+      "enabled": true,
+      "environment": {
+        "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
+      }
     },
     "microsoft/markitdown": {
       "type": "local",

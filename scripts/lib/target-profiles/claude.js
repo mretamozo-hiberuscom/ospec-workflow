@@ -48,6 +48,10 @@ module.exports = {
     description:
       "SDD orchestrator — coordinate phases, delegate to the sdd-* phase agents, enforce review/TDD gates, and persist OpenSpec state. Load for any /sdd-* or spec-driven workflow request.",
   },
+  // Rewrite ${input:NAME} → ${NAME:-} in .mcp.json env/args/url/headers.
+  // Claude Code expands ${VAR:-default}; the empty default keeps config
+  // parseable when the variable is unset.
+  mcpPlaceholders: { style: "env-expansion" },
   // argv form, run with shell:false (see github-copilot profile). The external
   // `claude` binary must be invocable by this exact name on PATH.
   validate: ["claude", "plugin", "validate", "--strict", "{out}"],

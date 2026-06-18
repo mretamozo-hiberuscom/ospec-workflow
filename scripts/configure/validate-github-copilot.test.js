@@ -121,6 +121,28 @@ test("validate rejects a malformed .mcp.json (missing servers and missing transp
   assert.ok(validate(out).errors.some((error) => error.includes("server bad must define a command")));
 });
 
+test("validate rejects residual ${input: placeholder in .mcp.json", (t) => {
+  const out = tmpOut(t);
+  runConfigure({ sourceDir: SOURCE, target: "github-copilot", outDir: out, validate: false });
+  // Poison the generated .mcp.json with an unresolved input placeholder.
+  fs.writeFileSync(
+    path.join(out, ".mcp.json"),
+    JSON.stringify(
+      { mcpServers: { svc: { command: "npx", env: { RESIDUAL_KEY: "${input:RESIDUAL_KEY}" } } } },
+      null,
+      2,
+    ),
+  );
+
+  const result = validate(out);
+
+  assert.ok(result.errors.length > 0, "must report at least one error");
+  assert.ok(
+    result.errors.some((error) => error.includes("${input:")),
+    "at least one error must reference the residual placeholder",
+  );
+});
+
 test("validate rejects case-insensitive vscode residue and unexpected Copilot markdown suffixes", (t) => {
   const out = tmpOut(t);
   runConfigure({ sourceDir: SOURCE, target: "github-copilot", outDir: out, validate: false });

@@ -226,6 +226,25 @@ function validateConfig(root, errors) {
   }
 }
 
+// Scan opencode.json for unresolved ${input:NAME} placeholders. These residuals
+// indicate the transformMcpServers/toOpencodeVars path was bypassed or broken.
+// Scoped to opencode.json only (.mcp.json is already a forbidden path in opencode output).
+function validateMcpResidualPlaceholders(root, errors) {
+  const rel = "opencode.json";
+  if (pathType(root, rel) !== "file") {
+    return;
+  }
+  let text;
+  try {
+    text = readUtf8(root, rel);
+  } catch {
+    return; // read failure already covered by validateRequiredPaths
+  }
+  if (/\$\{input:/.test(text)) {
+    addError(errors, `residual \${input: placeholder found in ${rel} — toOpencodeVars transform must rewrite all VS Code input placeholders`);
+  }
+}
+
 // The plugin shim bridges opencode events to the ospec-hooks Go binary via
 // spawnSync. Validate that the plugin uses spawnSync, references the binary,
 // and wires both required subcommands.
@@ -282,6 +301,7 @@ function validate(root) {
   validateAgents(absRoot, errors);
   validateCommands(absRoot, errors);
   validateConfig(absRoot, errors);
+  validateMcpResidualPlaceholders(absRoot, errors);
   validatePlugin(absRoot, errors);
   validateSkillReferences(absRoot, errors);
 

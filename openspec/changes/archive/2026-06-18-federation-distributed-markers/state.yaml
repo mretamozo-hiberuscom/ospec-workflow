@@ -1,0 +1,339 @@
+schema: sdd-change-state
+change: federation-distributed-markers
+
+classification: high-risk
+
+program:
+  anchor: openspec/changes/federation-distributed-markers/program.md
+  role: C1 — mechanism layer + workspace-explore phase
+  scope_note: >
+    Scope reduced to the federation MECHANISM (`.git` discovery, marker schema with
+    type/layer, atlas-as-derived-cache, enroll, target_dir for sdd-init) plus the
+    workspace-explore/classify phase. The foundation pipeline (baseline orchestration,
+    general foundation, general baseline, roadmap/gaps) is split into follow-on changes
+    C2–C5, registered in program.md and planned in dependency order.
+  follow_on_changes:
+    - federated-baseline-orchestration
+    - federated-foundation
+    - federated-general-baseline
+    - federated-roadmap-gaps
+
+session:
+  artifact_store: openspec
+  execution_mode: interactive
+  delivery_strategy: single-pr
+  reply_language: es
+
+status: archived
+last_updated: 2026-06-18T00:00:00Z
+
+route:
+  intended_route: standard
+  actual_route: standard
+  route_rationale: >
+    project.status=active and classification=high-risk. The federated route was
+    NOT selected because this repo's artifact_store.backend is `openspec`
+    (single-repo); the change is ABOUT federation but is built in a single repo.
+    sdd-explore is run as a pre-phase to map the existing federation code before
+    proposing, because the redesign inverts the atlas contract over tested code.
+  validated: true
+  validation_errors: []
+
+blocking_questions: []
+
+phases:
+  explore:
+    status: done
+    artifact: openspec/changes/federation-distributed-markers/exploration.md
+  proposal:
+    status: done
+    artifact: openspec/changes/federation-distributed-markers/proposal.md
+  spec:
+    status: done
+    artifacts:
+      - openspec/changes/federation-distributed-markers/specs/federation-markers/spec.md
+      - openspec/changes/federation-distributed-markers/specs/workspace-explore/spec.md
+      - openspec/changes/federation-distributed-markers/specs/agents/spec.md
+      - openspec/changes/federation-distributed-markers/specs/skills/spec.md
+    residual_ambiguity: false
+    amendments:
+      - date: 2026-06-17
+        summary: >
+          member.provides promoted from string[] to object[] with sub-fields
+          id (MUST), consumers (MAY empty), surface (MAY absent). New Requirement
+          "Impact Set from Provides Consumers" added with 2 scenarios. Merge
+          semantics note added (provides adopted wholesale). Clarification entry
+          registered.
+  clarify:
+    status: done
+    questions_asked: 4
+    residual_ambiguity: false
+    artifacts:
+      - openspec/changes/federation-distributed-markers/specs/federation-markers/spec.md
+      - openspec/changes/federation-distributed-markers/specs/workspace-explore/spec.md
+      - openspec/changes/federation-distributed-markers/specs/agents/spec.md
+      - openspec/changes/federation-distributed-markers/specs/skills/spec.md
+  design:
+    status: done
+    artifact: openspec/changes/federation-distributed-markers/design.md
+  tasks:
+    status: done
+    artifact: openspec/changes/federation-distributed-markers/tasks.md
+  apply:
+    status: done
+    artifact: openspec/changes/federation-distributed-markers/apply-progress.md
+    work_units:
+      WU1:
+        status: done
+        phases: ["Phase 1", "Phase 2"]
+      WU2:
+        status: done
+        phases: ["Phase 3"]
+      WU3:
+        status: done
+        phases: ["Phase 4"]
+      WU4:
+        status: done
+        phases: ["Phase 5"]
+      WU5:
+        status: done
+        phases: ["Phase 6"]
+      WU6:
+        status: done
+        phases: ["Phase 7"]
+        note: >
+          Follow-on security slice closing risk-critical-001 (path traversal).
+          Added after apply was done; apply remains done.
+      WU7:
+        status: done
+        phases: ["Phase 8"]
+        note: >
+          Follow-on hardening slice closing resilience-warning-001 (readExistingMarker
+          data-loss on non-ENOENT I/O error) and risk-warning-symlink-001 (lexical-only
+          containment symlink escape). Added after apply was done; apply remains done.
+  verify:
+    status: done
+    stale: false
+    artifact: openspec/changes/federation-distributed-markers/verify-report.md
+    verdict: PASS WITH WARNINGS
+    test_evidence: "362 pass / 0 fail / 0 skipped (node --test scripts/**/*.test.js; also embedded in npm test via check.js Native Node tests step; npm test → All checks passed., 0 errors/0 warnings)"
+    reverified_at: 2026-06-18T00:00:00Z
+    reverify_note: >
+      FINAL re-verify after WU7 (commit a6e3c46) landed the hardening slice. Both WU7
+      findings confirmed CLOSED BY TESTS: Fix A resilience-warning-001 / reliability-warning-002
+      (readExistingMarker now splits read vs parse; non-ENOENT I/O errors rethrow so a healthy
+      marker is byte-preserved instead of overwritten, proven by EACCES byte-preservation +
+      EISDIR rethrow tests; present-but-unparseable self-heal still rewrites status:written);
+      Fix B risk-warning-symlink-001 (physical isRealPathWithinRoot lstat/realpath guard at the
+      scanMemberMarkers boundary skips an existing symlink/junction escaping the real container
+      on BOTH read and write paths, proven by scanMemberMarkers read-path + explore write-path
+      symlink-escape tests; first-enroll and in-root members still work). risk-critical-001 (WU6)
+      remains CLOSED with no regression (lexical isWithinRoot ../-/absolute rejection preserved
+      alongside the new physical guard). parseAtlas byte-identical across WU6+WU7. Full native
+      suite 362/362 (353 WU1-WU5 + 4 WU6 + 5 WU7); isolated artifact-store 17/17 (git flake
+      reliability-warning-001 did NOT reproduce). Remaining open advisories: W1 spec wording,
+      W2 heuristic corruption, W3 git flake, W4 agent-procedure static-proof, S1-S6 suggestions
+      (incl. explore non-atomic write + 2 readability). Verdict: PASS WITH WARNINGS; ready to archive.
+  archive:
+    status: done
+    artifact: openspec/changes/federation-distributed-markers/archive-report.md
+    archived_at: 2026-06-18T00:00:00Z
+    archive_location: openspec/changes/archive/2026-06-18-federation-distributed-markers/
+    close_gate: pass-with-warnings-accepted
+    specs_synced:
+      - domain: federation-markers
+        action: created
+        requirements_added: 7
+      - domain: workspace-explore
+        action: created
+        requirements_added: 3
+      - domain: agents
+        action: updated
+        requirements_added: 1
+      - domain: skills
+        action: updated
+        requirements_added: 2
+    spec_drift: none
+    index_updated: openspec/specs/_baseline/index.md
+    follow_ups_carried_forward:
+      anchor: openspec/changes/federation-distributed-markers/program.md
+      proposed_change: federation-c1-hardening
+      findings: [W1, W2, W3, W4, S1, S2, S3, S4, S5, S6, readability-1, readability-2]
+    physical_move:
+      status: pending-user
+      reason: archive agent environment has no terminal/move/delete tooling
+      command: >
+        git mv openspec/changes/federation-distributed-markers
+        openspec/changes/archive/2026-06-18-federation-distributed-markers
+    git:
+      branch: feat/federation-distributed-markers
+      branch_deleted: false
+      pushed: false
+      archive_commit_created: false
+
+gates:
+  4r-review-gate:
+    status: done
+    on_blocker: advisory
+    findings_summary: "1 CRITICAL, 4 WARNING (3 reliability/resilience + 1 risk), 6 SUGGESTION"
+    surfaced_to_user: true
+    findings:
+      - id: risk-critical-001
+        reviewer: review-risk
+        severity: CRITICAL
+        origin: code-bug
+        status: closed
+        remediated_by: WU6
+        confirmed_by: review-risk re-review (commit 8656fc4) + sdd-verify re-run (357/357)
+        summary: >
+          Path traversal in member scanning. parseGitmodulesPaths inserts
+          .gitmodules `path = ...` values unvalidated into memberDirs; explore →
+          enroll then mkdir/writes a marker outside containerRoot (arbitrary file
+          write/create). Same root cause enables out-of-tree reads (W: info disclosure).
+        affected:
+          - scripts/lib/workspace-atlas.js:441
+          - scripts/lib/federation-explore.js:216
+          - scripts/lib/federation-marker.js:363
+        fix_hint: >
+          After resolving memberRoot, reject (warn+skip) any path whose
+          path.resolve(containerRoot, memberDir) does not start with
+          containerRoot + path.sep.
+        status: remediated
+        remediated_by: WU6
+        remediation: >
+          Added shared isWithinRoot(containerRoot, candidateAbs) guard in
+          workspace-atlas.js and applied it at the single discovery boundary
+          (scanMemberMarkers): escaping .gitmodules member paths are warned and
+          skipped (fail-open), protecting BOTH the read path (loadMarkerFromMember/
+          classifyMember) and the write path (explore -> enroll). Covered by 4 new
+          RED-first tests (workspace-atlas.test.js + federation-explore.test.js).
+      - id: reliability-warning-001
+        reviewer: review-reliability
+        severity: WARNING
+        origin: tasks-gap
+        summary: git integration test non-deterministic (env not isolated; spawnSync exit codes unchecked).
+        affected: [scripts/lib/artifact-store.test.js:368]
+      - id: resilience-warning-001
+        reviewer: review-resilience
+        severity: WARNING
+        origin: code-bug
+        status: closed
+        remediated_by: WU7
+        confirmed_by: sdd-apply WU7 RED-first tests (federation-marker.test.js) + full native suite 362/362
+        summary: >
+          readExistingMarker swallows ALL non-ENOENT errors as "corrupt"; a transient
+          EACCES/EBUSY read error makes enroll overwrite a healthy marker (data loss).
+        affected: [scripts/lib/federation-marker.js:345]
+        fix_hint: rethrow when error.code is neither ENOENT nor a parse failure.
+        remediation: >
+          Split readExistingMarker into a read phase and a parse phase. ENOENT on read
+          -> null (absent, write fresh); any other read error (EACCES/EBUSY/EISDIR/lock)
+          -> RETHROW so enroll aborts instead of overwriting a healthy marker; parse
+          failure on present content -> null (corrupt self-heal rewrite). Covered by 2
+          RED-first tests (EACCES data-loss + EISDIR rethrow) plus a green self-heal
+          regression test.
+      - id: reliability-warning-002
+        reviewer: review-reliability
+        severity: WARNING
+        origin: tasks-gap
+        status: closed
+        remediated_by: WU7
+        confirmed_by: sdd-apply WU7 self-heal regression test (federation-marker.test.js)
+        summary: corrupt/empty existing-marker recovery path in enroll has no test.
+        affected: [scripts/lib/federation-marker.js:324]
+        remediation: >
+          Added a green regression test asserting a present-but-unparseable (whitespace)
+          marker is rewritten with status "written" (corrupt self-heal path covered).
+      - id: risk-warning-symlink-001
+        reviewer: review-risk
+        severity: WARNING
+        origin: code-bug
+        status: closed
+        remediated_by: WU7
+        confirmed_by: sdd-apply WU7 RED-first symlink tests (workspace-atlas.test.js + federation-explore.test.js) + full native suite 362/362
+        summary: >
+          WU6 containment (isWithinRoot) is purely lexical (path.resolve, not
+          fs.realpath). A real symlink planted inside containerRoot whose name does
+          not contain ../ passes the check and lets loadMarkerFromMember/enroll
+          follow it out of root. Distinct from risk-critical-001 (lexical ../ /
+          absolute vector, which is closed). Advisory, non-blocking for C1.
+        affected: [scripts/lib/workspace-atlas.js:441]
+        fix_hint: resolve with fs.realpath before the containment check, or refuse symlinked member dirs.
+        remediation: >
+          Added a physical containment guard isRealPathWithinRoot(containerRoot, candidateAbs)
+          that resolves the real on-disk path with fs.realpath/fs.lstat and applied it at the
+          scanMemberMarkers discovery->use boundary (warn + skip, fail-open). A not-yet-existing
+          first-enroll dir (lstat ENOENT) is accepted; a non-symlink entry is accepted; an
+          EXISTING symlink escaping or dangling outside the real root is rejected. The lexical
+          isWithinRoot ../ /absolute rejection is preserved (no risk-critical-001 regression).
+          Both read (loadMarkerFromMember/classifyMember) and write (explore -> enroll) paths
+          inherit the guard since both consume scanMemberMarkers. Covered by 2 RED-first tests.
+    suggestions_count: 6
+
+approvals:
+  - id: execution-mode-001
+    gate: execution-mode
+    decision: interactive
+    source: vscode/askQuestions
+    accepted_at: 2026-06-17T00:00:00Z
+    applies_to:
+      - sdd-orchestrator
+  - id: delivery-strategy-001
+    gate: delivery-strategy
+    decision: single-pr
+    source: vscode/askQuestions
+    accepted_at: 2026-06-17T00:00:00Z
+    applies_to:
+      - sdd-tasks
+      - sdd-apply
+  - id: review-workload-001
+    gate: review-workload
+    decision: feature-branch-chain
+    source: vscode/askQuestions
+    accepted_at: 2026-06-17T00:00:00Z
+    rationale: >
+      tasks forecast ~580–650 net lines across 13 files, exceeds the 400-line
+      budget. User chose a chained delivery over size:exception. sdd-apply
+      implements only the next autonomous slice per run, using work-unit commits.
+    applies_to:
+      - sdd-apply
+
+chain:
+  strategy: feature-branch-chain
+  order: [WU1, WU2, WU3, WU4, WU5, WU6, WU7]
+  slices:
+    - id: WU1
+      scope: workspace-atlas.js marker read/merge/serialize + loadAtlas regeneration branch + Phase 1 regression baseline
+      risk: high
+      status: done
+    - id: WU2
+      scope: federation-marker.js enroll (idempotent, atomic)
+      depends_on: [WU1]
+      status: done
+    - id: WU3
+      scope: sdd-init container detection + target_dir via ## Parameters
+      depends_on: [WU1]
+      status: done
+    - id: WU4
+      scope: sdd-workspace enroll + explore subcommand
+      depends_on: [WU1, WU2]
+      status: done
+    - id: WU5
+      scope: .gitignore, persistence-contract.md, orchestrator note, final verification
+      depends_on: [WU1, WU2, WU3, WU4]
+      status: done
+    - id: WU6
+      scope: security fix — path-traversal containment guard (isWithinRoot + scanMemberMarkers boundary)
+      depends_on: [WU1, WU4]
+      risk: high
+      remediates: risk-critical-001
+      status: done
+    - id: WU7
+      scope: hardening — readExistingMarker I/O-vs-absence distinction + physical (realpath) symlink containment in scanMemberMarkers
+      depends_on: [WU2, WU4, WU6]
+      risk: high
+      remediates: [resilience-warning-001, reliability-warning-002, risk-warning-symlink-001]
+      status: done
+  delivered: true
+
+open_decisions: []

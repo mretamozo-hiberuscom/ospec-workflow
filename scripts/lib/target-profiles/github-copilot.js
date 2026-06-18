@@ -44,8 +44,9 @@ module.exports = {
     stripPathVar: "${CLAUDE_PLUGIN_ROOT}/",
   },
 
-  // MCP is project-level for Copilot CLI: .mcp.json (root) is read as-is (same
-  // {mcpServers} schema), so it passes through unchanged.
+  // MCP is project-level for Copilot CLI: .mcp.json (root) is kept at the repo
+  // root and normalized via normalizeMcpPlaceholders (${input:NAME} → ${NAME:-}).
+  // See mcpPlaceholders below.
 
   // Set the environment field on agents; strip VS Code-only / plugin-only keys.
   setAgentFrontmatter: { target: "github-copilot" },
@@ -58,9 +59,13 @@ module.exports = {
   // vscode/askQuestions maps to Copilot's structured question tool, ask_user.
   toolMap: { "vscode/askQuestions": "ask_user" },
 
+  // Rewrite ${input:NAME} → ${NAME:-} in .mcp.json env/args/url/headers.
+  // Copilot CLI shares the same ${VAR:-default} syntax as Claude Code.
+  mcpPlaceholders: { style: "env-expansion" },
+
   // Drop only the Claude plugin manifest. .mcp.json and hooks are KEPT (hooks are
-  // reshaped to .github/hooks/; MCP passes through), and skills/ ships so agent
-  // "Skills to load before work" references resolve.
+  // reshaped to .github/hooks/; .mcp.json is normalized via normalizeMcpPlaceholders),
+  // and skills/ ships so agent "Skills to load before work" references resolve.
   drop: [".claude-plugin/"],
 
   // No model injection: the source omits model and github-copilot has no models.yaml column.

@@ -3,7 +3,10 @@
     "io.github.upstash/context7": {
       "type": "stdio",
       "command": "npx",
-      "args": ["@upstash/context7-mcp@1.0.31"]
+      "args": ["@upstash/context7-mcp@1.0.31"],
+      "env": {
+        "CONTEXT7_API_KEY": "${input:CONTEXT7_API_KEY}"
+      }
     },
     "microsoft/markitdown": {
       "type": "stdio",

@@ -43,6 +43,39 @@ Run this phase when the orchestrator/user asks to initialize SDD in a project. Y
 | `baseline` block already present (any status) | Preserve it unchanged; if `status` is `pending` or `partial`, return `next_recommended: sdd-baseline`. |
 | `baseline.status: done` | Brownfield branch does not activate; fall back to standard `next_recommended` logic. |
 
+## Pre-Execution: Federated Bridge (`target_dir` + Multirepo Detection)
+
+Run this resolution BEFORE any of the Execution Steps below. It resolves the base path
+and gates federated workspaces. No artifact is written until this resolution passes.
+
+### Step 0a — Resolve the base path from `target_dir`
+
+- Read `target_dir` from the `## Parameters` prompt block (the `target_dir: <path>` line),
+  using the same injection pattern as `## Project Standards`. There is no env var and no
+  dynamic frontmatter field.
+- When the `## Parameters` block is **absent** or the `target_dir` key is **missing**, fall
+  back to the current working directory (cwd). This is the backward-compatible default.
+- When `target_dir` is **present**, `fs.stat` the path:
+  - If it does not exist (`ENOENT`), STOP immediately and return `status: blocked` with a
+    `question_gate(invalid-path)` describing the non-existent path. Do NOT create files at
+    any location — the invalid-path gate fires before any artifact write.
+  - If it exists, use it as the resolved base path; all artifact reads/writes are relative
+    to it.
+
+### Step 0b — Multirepo container detection gate
+
+After resolving a valid base path, scan its immediate children (depth-1 only, no recursion):
+
+- If the resolved base path has **no own `.git`** (no `.git` of its own) AND has **two or more** (≥2) immediate children that each contain `.git` (directory OR file), treat it as a
+  workspace container and STOP: return `status: blocked` with a `question_gate` listing
+  exactly two options — `federated` (initialize as a federated workspace) and `normal`
+  (initialize as a single repo). Never auto-select the federated path. This gate fires
+  **before any artifact write**; no files are created until the user responds.
+- If the base path has its own `.git` (single-repo), the container gate does NOT trigger and
+  init falls through to the normal flow unchanged.
+- If there are fewer than two children with `.git` (threshold is ≥2), the gate does NOT fire
+  and init continues as a normal single-repo init.
+
 ## Execution Steps
 
 1. Inspect project files (`package.json`, `go.mod`, `pyproject.toml`, CI, lint/test config) and summarize stack/conventions.

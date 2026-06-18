@@ -79,6 +79,12 @@ function handleFile(file, profile, models, rulesContent) {
     return handleCommand(file, profile);
   }
 
+  // .mcp.json for profiles with MCP placeholder normalization enabled.
+  // Must sit before passthrough so profiles without mcpPlaceholders fall through.
+  if (profile.mcpPlaceholders && path === ".mcp.json") {
+    return normalizeMcpPlaceholders(file);
+  }
+
   // Passthrough (skills, shared docs). Tool names are still substituted so no
   // foreign namespace survives anywhere in the generated tree.
   if (profile.toolMap && path.endsWith(".md")) {
@@ -512,6 +518,42 @@ function mapVarValues(obj) {
     out[key] = toOpencodeVars(value);
   }
   return out;
+}
+
+// Rewrite VS Code input placeholders to the env-expansion form Claude Code and
+// Copilot CLI both understand: ${input:NAME} -> ${NAME:-} (empty default keeps
+// host config parseable when NAME is unset). Mirrors toOpencodeVars.
+// Function replacer avoids any $-token ambiguity in the replacement string.
+function toEnvExpansion(value) {
+  if (typeof value !== "string") return value;
+  return value.replace(/\$\{input:([A-Za-z_][A-Za-z0-9_]*)\}/g, (_m, name) => "${" + name + ":-}");
+}
+
+// Like mapVarValues but accepts a mapper fn instead of always using toOpencodeVars.
+// Allows normalizeMcpPlaceholders to reuse the object-walk pattern with toEnvExpansion.
+function mapVarValuesWith(obj, fn) {
+  const out = {};
+  for (const [key, value] of Object.entries(obj)) {
+    out[key] = fn(value);
+  }
+  return out;
+}
+
+// Parse .mcp.json, rewrite only env/args/url/headers string values via
+// toEnvExpansion, reserialize. command is intentionally NOT rewritten
+// (it is an executable path, not a secret value — ${input:…} placeholders
+// are not expected there). Returns a fresh { path, content } — input file
+// is never mutated.
+function normalizeMcpPlaceholders(file) {
+  const obj = JSON.parse(file.content);
+  for (const server of Object.values(obj.mcpServers || {})) {
+    if (!server || typeof server !== "object") continue;
+    if (server.env) server.env = mapVarValuesWith(server.env, toEnvExpansion);
+    if (Array.isArray(server.args)) server.args = server.args.map(toEnvExpansion);
+    if (typeof server.url === "string") server.url = toEnvExpansion(server.url);
+    if (server.headers) server.headers = mapVarValuesWith(server.headers, toEnvExpansion);
+  }
+  return { path: file.path, content: JSON.stringify(obj, null, 2) };
 }
 
 function escapeRegExp(value) {

@@ -42,6 +42,23 @@ Do not duplicate or redefine that logic in this agent file.
 
 Never guess project capabilities. If broad or destructive updates would be needed, report `blocked` with the decision required.
 
+## Parameters
+
+The orchestrator injects a `## Parameters` block into the launch prompt (the same pattern
+used for `## Project Standards`). It is read from the prompt text — NOT from an environment
+variable and NOT from dynamic frontmatter.
+
+- `target_dir: <path>` — the directory in which to perform initialization. Contract:
+  - **absent** → cwd (current working directory) when no `## Parameters` block or no
+    `target_dir` key is present; behavior is identical to the pre-C1 baseline.
+  - **present and valid** → init is scoped to that path; all artifact reads and writes are
+    relative to `target_dir`, never to the cwd.
+  - **present but non-existent** (`fs.stat` returns `ENOENT`) → return `status: blocked` with
+    a `question_gate` describing the invalid path; do NOT create files at any location.
+
+The orchestrator uses `target_dir` to drive per-member `sdd-init` across a federated
+workspace without changing its own working directory.
+
 ## Result Contract
 
 Return a structured result with these fields:
