@@ -7,7 +7,7 @@ session:
   artifact_store: openspec
   delivery_strategy: single-pr
 
-status: ready-for-verify
+status: archived
 last_updated: 2026-06-16T18:30:00Z
 
 blocking_questions: []
@@ -33,7 +33,7 @@ phases:
     status: done
     artifact: openspec/changes/mcp-placeholder-normalization/verify-report.md
   archive:
-    status: pending
+    status: done
 
 open_decisions:
   - id: A-default-empty-form
