@@ -86,20 +86,21 @@ Proceder con el descubrimiento guiado estándar paso a paso definido en `## Exec
 
 1. Load shared SDD rules and project standards if provided by the orchestrator. En modo federado, recibir el parámetro `workspace_yaml` y mapear la ubicación del atlas.
 2. Read `openspec/config.yaml`, existing `docs/**`, and any candidate source documents. En modo federado, leer también `openspec/workspace.yaml` para descubrir los miembros del workspace y sus relaciones de contratos.
-3. Para cada miembro descubierto, si el miembro está inicializado (tiene `openspec/config.yaml`), leer sus especificaciones locales bajo `{member}/openspec/specs/**/spec.md` resolviendo su ruta mediante la ruta relativa del atlas.
-4. Build a gap map: product, users, capabilities, non-functional constraints, stack, architecture, commands, testing, deployment, roadmap.
-5. Persist confirmed facts and open questions into docs/config before returning, even when discovery is incomplete.
-6. If a blocking gap remains, ask exactly one question and return `blocked`.
+3. Para cada miembro descubierto, si el miembro está inicializado (tiene `openspec/config.yaml`), leer sus especificaciones locales bajo `{member}/openspec/specs/**/spec.md` y su roadmap local bajo `{member}/docs/roadmap.md`, resolviendo sus rutas mediante la ruta relativa del atlas.
+4. Build a gap map and check for functional gaps (capabilities defined in `functional-scope.md` not covered by any member spec/roadmap) and technical gaps (dependency deviations from `shared-baseline.md` or contract provider/consumer mismatches).
+5. Persist confirmed facts, open questions, and gap analysis results into `docs/roadmap-gaps.md` before returning.
+6. If active unresolved gaps exist, trigger a Q&A gate via `vscode/askQuestions` (or return `status: blocked` with `question_gate`) to ask the user how to resolve them. Options must include: assign to a member, defer capability, or create a new member directory. Record user resolutions under `approvals` in `state.yaml` and `gaps_resolutions` in `openspec/config.yaml`.
 7. Create or update:
    - `docs/product/brief.md`
    - `docs/product/functional-scope.md`
    - `docs/product/glossary.md`
    - `docs/architecture/technical-baseline.md` (En modo federado, incluir obligatoriamente la sección **"Mapa de Contratos e Interacciones"** detallando de forma estructurada qué contratos `provides` y `consumers` están definidos entre los módulos del atlas).
    - `docs/architecture/decisions/README.md`
-   - `docs/roadmap.md`
+   - `docs/roadmap.md` (En modo federado, consolidar todos los hitos y metas de los roadmaps locales de los miembros en la sección del miembro correspondiente).
+   - `docs/roadmap-gaps.md` (Catalogar de forma estructurada todos los gaps funcionales/técnicos y sus estados de resolución).
    - `docs/references/raw/README.md`
    - `docs/references/processed/README.md`
-8. Update `openspec/config.yaml` with foundation context, selected stack, expected commands, testing intent, and `rules.foundation`.
+8. Update `openspec/config.yaml` with foundation context, selected stack, expected commands, testing intent, `rules.foundation`, and any `gaps_resolutions`.
 9. Return the structured result and recommend `/sdd-new scaffold-project` or the first named capability.
 
 ## Output Contract

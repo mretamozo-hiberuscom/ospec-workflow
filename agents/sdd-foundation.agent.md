@@ -53,7 +53,12 @@ When the MCP tool is unavailable, the agent initiates an interactive fallback lo
 
 ### Federated Workspace Mode
 
-When operating in a federated multirepo workspace, this agent accepts parameters like `workspace_yaml` and `parent_change`. It scans the member repositories defined in `workspace.yaml` and reads their member specification files (e.g. `{member}/openspec/specs/**/spec.md`) to synthesize the overall project foundation and map dependencies.
+When operating in a federated multirepo workspace, this agent accepts parameters like `workspace_yaml` and `parent_change`. It scans the member repositories defined in `workspace.yaml`, reads their member specification files (e.g. `{member}/openspec/specs/**/spec.md`) and roadmaps (e.g. `{member}/docs/roadmap.md`) to:
+1. Consolidate milestones into `docs/roadmap.md`.
+2. Analyze and catalog functional and technical gaps into `docs/roadmap-gaps.md`.
+3. Halt execution and return `status: blocked` with `question_gate` when unresolved active gaps require user decisions.
+
+Resolutions are registered in `state.yaml` approvals ledger and `openspec/config.yaml` `gaps_resolutions`.
 
 ## Result Contract
 

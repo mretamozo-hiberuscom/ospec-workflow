@@ -1,0 +1,68 @@
+change: federated-roadmap-gaps
+program: federation (C5)
+depends_on:
+  - federated-general-baseline   # C4 (archived 2026-06-19)
+created_at: "2026-06-19"
+branch: main
+
+status: "archived"
+last_updated: "2026-06-19T00:12:00Z"
+blocking_questions: []
+classification: normal
+classification_confidence: deterministic
+classification_rationale: >
+  Introduces roadmap aggregation, gap analysis, and interactive Q&A gap resolution
+  within the federated workspace onboarding flow.
+
+route:
+  intended_route: standard
+  actual_route: standard
+  route_rationale: >
+    Standard route selected for normal classification.
+  validated: true
+  validation_errors: []
+
+session:
+  execution_mode: interactive
+  delivery_strategy: ask-on-risk
+  reply_language: es
+
+phases:
+  explore:
+    status: done
+    artifact: "openspec/changes/federated-roadmap-gaps/exploration.md"
+    completed_at: "2026-06-19T00:10:00Z"
+  propose:
+    status: done
+    artifact: "openspec/changes/federated-roadmap-gaps/proposal.md"
+    completed_at: "2026-06-19T00:10:00Z"
+  spec:
+    status: done
+    artifacts:
+      - openspec/changes/federated-roadmap-gaps/specs/federated-roadmap-gaps/spec.md
+    completed_at: "2026-06-19T00:10:00Z"
+  clarify:
+    status: skipped
+    completed_at: "2026-06-19T00:10:00Z"
+  design:
+    status: done
+    artifact: "openspec/changes/federated-roadmap-gaps/design.md"
+    completed_at: "2026-06-19T00:10:00Z"
+  tasks:
+    status: done
+    artifact: "openspec/changes/federated-roadmap-gaps/tasks.md"
+    completed_at: "2026-06-19T00:10:00Z"
+  apply:
+    status: done
+    artifact: "openspec/changes/federated-roadmap-gaps/apply-progress.md"
+    completed_at: "2026-06-19T00:11:00Z"
+  verify:
+    status: done
+    artifact: "openspec/changes/federated-roadmap-gaps/verify-report.md"
+    completed_at: "2026-06-19T00:12:00Z"
+  archive:
+    status: done
+    artifact: "openspec/changes/archive/2026-06-19-federated-roadmap-gaps/archive-report.md"
+    completed_at: "2026-06-19T00:12:00Z"
+
+approvals: []

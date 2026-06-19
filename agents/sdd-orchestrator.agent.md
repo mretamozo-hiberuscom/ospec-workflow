@@ -654,6 +654,13 @@ When launching `sdd-apply` for a continuation batch (not the first batch):
 
 This prevents progress loss across batches. The sub-agent is responsible for read-merge-write, but the orchestrator MUST tell it that previous progress exists.
 
+#### Gaps Resolution Handling (MANDATORY)
+
+When `sdd-foundation` returns `status: blocked` with a `question_gate` indicating unresolved functional or technical gaps, the orchestrator MUST:
+1. Intercept the block and call `vscode/askQuestions` with the gap resolution options.
+2. Record the user's resolution decision under the `approvals` ledger in `state.yaml` and append it to `gaps_resolutions` in `openspec/config.yaml`.
+3. Relaunch `sdd-foundation` with the resolved gaps decisions context so it can generate the finalized `docs/roadmap-gaps.md` and consolidated `docs/roadmap.md`.
+
 #### OpenSpec Artifact Paths
 
 When launching sub-agents for SDD phases, pass these exact OpenSpec paths as artifact references:
@@ -662,6 +669,7 @@ When launching sub-agents for SDD phases, pass these exact OpenSpec paths as art
 |----------|-----------|
 | Project context/testing | `openspec/config.yaml` |
 | Foundation docs | `docs/product/brief.md`, `docs/product/functional-scope.md`, `docs/architecture/technical-baseline.md`, `docs/roadmap.md` |
+| Roadmap gaps | `docs/roadmap-gaps.md` |
 | Exploration | `openspec/changes/{change-name}/exploration.md` |
 | Proposal | `openspec/changes/{change-name}/proposal.md` |
 | Lite proposal | `openspec/changes/{change-name}/proposal-lite.md` |

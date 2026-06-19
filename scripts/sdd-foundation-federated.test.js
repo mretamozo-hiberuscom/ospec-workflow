@@ -62,6 +62,33 @@ test("SKILL.md documents synthesizing the 'Mapa de Contratos e Interacciones' se
   );
 });
 
+test("SKILL.md documents consolidating member roadmaps", () => {
+  const text = read(SKILL);
+  assert.match(
+    text,
+    /roadmap\.md[\s\S]{0,200}?(consolidar|miembro|member|agregar)/i,
+    "SKILL.md must document aggregating member roadmaps into docs/roadmap.md"
+  );
+});
+
+test("SKILL.md documents mapping gaps and writing docs/roadmap-gaps.md", () => {
+  const text = read(SKILL);
+  assert.match(
+    text,
+    /roadmap-gaps\.md/i,
+    "SKILL.md must document mapping functional/technical gaps to docs/roadmap-gaps.md"
+  );
+});
+
+test("SKILL.md documents gaps resolution Q&A gate", () => {
+  const text = read(SKILL);
+  assert.match(
+    text,
+    /gaps[\s\S]{0,300}?(resolución|resolve|pregunta|askQuestions|question_gate)/i,
+    "SKILL.md must document resolving gaps via askQuestions/question_gate"
+  );
+});
+
 // --- agents/sdd-foundation.agent.md -------------------------------------------
 
 test("agent.md documents accepting federated parameters and scanning member specs", () => {
@@ -78,6 +105,20 @@ test("agent.md documents accepting federated parameters and scanning member spec
   );
 });
 
+test("agent.md documents gaps mapping and roadmap consolidation", () => {
+  const text = read(AGENT);
+  assert.match(
+    text,
+    /roadmap-gaps\.md/i,
+    "agent.md must document generating roadmap-gaps.md"
+  );
+  assert.match(
+    text,
+    /roadmap\.md/i,
+    "agent.md must document aggregating member roadmaps"
+  );
+});
+
 // --- agents/sdd-orchestrator.agent.md -----------------------------------------
 
 test("orchestrator.agent.md documents routing to sdd-foundation with federated parameters", () => {
@@ -88,3 +129,13 @@ test("orchestrator.agent.md documents routing to sdd-foundation with federated p
     "orchestrator.agent.md must describe routing/delegating to sdd-foundation with federated parameters"
   );
 });
+
+test("orchestrator.agent.md documents handling gaps Q&A resolutions", () => {
+  const text = read(ORCHESTRATOR);
+  assert.match(
+    text,
+    /gaps[\s\S]{0,300}?(resolución|resoluciones|pregunta|askQuestions|state\.yaml|approvals)/i,
+    "orchestrator.agent.md must describe handling gaps resolutions and updating approvals/state.yaml"
+  );
+});
+
