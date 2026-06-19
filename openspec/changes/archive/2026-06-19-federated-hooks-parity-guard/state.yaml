@@ -1,13 +1,13 @@
 change:
   name: federated-hooks-parity-guard
-  status: ready-for-archive
-  phase: verify
+  status: archived
+  phase: archive
   classification: normal
   delivery: single-pr
   delivery_strategy: exception-ok
   artifact_store: openspec
   created_at: "2026-06-19T13:02:00Z"
-  updated_at: "2026-06-19T13:05:00Z"
+  updated_at: "2026-06-19T13:08:00Z"
 route:
   intended_route: standard
   actual_route: standard
@@ -17,27 +17,28 @@ route:
 phases:
   proposal:
     status: done
-    artifact: openspec/changes/federated-hooks-parity-guard/proposal.md
+    artifact: openspec/changes/archive/2026-06-19-federated-hooks-parity-guard/proposal.md
   spec:
     status: done
     artifacts:
-      - openspec/changes/federated-hooks-parity-guard/specs/launcher/spec.md
+      - openspec/changes/archive/2026-06-19-federated-hooks-parity-guard/specs/launcher/spec.md
   clarify:
     status: skipped
   design:
     status: done
-    artifact: openspec/changes/federated-hooks-parity-guard/design.md
+    artifact: openspec/changes/archive/2026-06-19-federated-hooks-parity-guard/design.md
   tasks:
     status: done
-    artifact: openspec/changes/federated-hooks-parity-guard/tasks.md
+    artifact: openspec/changes/archive/2026-06-19-federated-hooks-parity-guard/tasks.md
   apply:
     status: done
-    artifact: openspec/changes/federated-hooks-parity-guard/apply-progress.md
+    artifact: openspec/changes/archive/2026-06-19-federated-hooks-parity-guard/apply-progress.md
   verify:
     status: done
-    artifact: openspec/changes/federated-hooks-parity-guard/verify-report.md
+    artifact: openspec/changes/archive/2026-06-19-federated-hooks-parity-guard/verify-report.md
   archive:
-    status: pending
+    status: done
+    artifact: openspec/changes/archive/2026-06-19-federated-hooks-parity-guard/archive-report.md
 gates:
   4r-review-gate:
     status: done
