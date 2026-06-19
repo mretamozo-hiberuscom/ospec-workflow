@@ -456,23 +456,44 @@ test("opencode emits the tools grant as a YAML map and expands abstract tools", 
 test("opencode derives mode from user-invocable (subagent worker vs primary entry)", () => {
   const out = transform({ files: makeSource(), profile: opencode, models: MODELS });
   assert.match(find(out, ".opencode/agents/sdd-apply.md").content, /\nmode: subagent\n/);
-  assert.match(find(out, ".opencode/agents/sdd-orchestrator.md").content, /\nmode: primary\n/);
+  assert.match(find(out, ".opencode/agents/ospec-workflow.md").content, /\nmode: primary\n/);
 });
 
 test("opencode injects provider/model slugs by tier", () => {
   const out = transform({ files: makeSource(), profile: opencode, models: MODELS });
-  assert.match(find(out, ".opencode/agents/sdd-orchestrator.md").content, /\nmodel: anthropic\/claude-opus-4-8\n/);
+  assert.match(find(out, ".opencode/agents/ospec-workflow.md").content, /\nmodel: anthropic\/claude-opus-4-8\n/);
   assert.match(find(out, ".opencode/agents/sdd-apply.md").content, /\nmodel: anthropic\/claude-sonnet-4-6\n/);
 });
 
 test("opencode commands keep agent routing, drop name, and use positional/$ARGUMENTS", () => {
   const out = transform({ files: makeSource(), profile: opencode, models: MODELS });
   const cmd = find(out, ".opencode/commands/sdd-apply.md").content;
-  assert.match(cmd, /\nagent: sdd-orchestrator\n/, "keep agent routing");
+  assert.match(cmd, /\nagent: ospec-workflow\n/, "keep agent routing");
   assert.doesNotMatch(cmd, /\nname:/, "drop name (filename is the id)");
   assert.match(cmd, /\$1/, "named ${input:changeName} -> $1");
   assert.match(cmd, /\$ARGUMENTS/, "bare ${input} -> $ARGUMENTS");
   assert.doesNotMatch(cmd, /\$\{input/, "no VS Code input placeholders remain");
+});
+
+test("opencode renames orchestrator agent and substitutes its name in prose/frontmatter", () => {
+  const out = transform({ files: makeSource(), profile: opencode, models: MODELS });
+  // check agent file renamed
+  assert.ok(find(out, ".opencode/agents/ospec-workflow.md"), "orchestrator agent renamed");
+  assert.ok(!find(out, ".opencode/agents/sdd-orchestrator.md"), "old orchestrator name removed");
+  
+  // check frontmatter name updated
+  const agentContent = find(out, ".opencode/agents/ospec-workflow.md").content;
+  const fm = parse(agentContent).frontmatter;
+  assert.equal(getField(fm, "name").value, "ospec-workflow");
+
+  // check body prose substitution
+  assert.match(agentContent, /Orchestrator body\. Delegate to each phase agent/);
+  
+  // check commands routing name update and body/description substitution
+  const cmdContent = find(out, ".opencode/commands/sdd-apply.md").content;
+  const cmdFm = parse(cmdContent).frontmatter;
+  assert.equal(getField(cmdFm, "agent").value, "ospec-workflow");
+  assert.equal(getField(cmdFm, "description").value, "desc");
 });
 
 test("opencode synthesizes opencode.json with mcp (from .mcp.json) and instructions glob", () => {

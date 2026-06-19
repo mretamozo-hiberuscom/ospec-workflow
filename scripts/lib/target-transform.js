@@ -87,8 +87,13 @@ function handleFile(file, profile, models, rulesContent) {
 
   // Passthrough (skills, shared docs). Tool names are still substituted so no
   // foreign namespace survives anywhere in the generated tree.
-  if (profile.toolMap && path.endsWith(".md")) {
-    return { path, content: substituteProse(file.content, profile.toolMap) };
+  if (path.endsWith(".md")) {
+    let content = file.content;
+    if (profile.toolMap) {
+      content = substituteProse(content, profile.toolMap);
+    }
+    content = substituteAgentNames(content, profile);
+    return { path, content };
   }
   return { path, content: file.content };
 }
@@ -205,6 +210,7 @@ function collectRules(files, profile) {
       if (profile.toolMap) {
         body = substituteProse(body, profile.toolMap);
       }
+      body = substituteAgentNames(body, profile);
       parts.push(body);
     }
   }
@@ -224,11 +230,13 @@ function emitOrchestratorSkill(file, profile, rulesContent) {
   if (rulesContent) {
     body = body.replace(/\s*$/, "") + "\n\n" + rulesContent + "\n";
   }
+  body = substituteAgentNames(body, profile);
 
   const nameField = getField(parsed.frontmatter, "name");
   const name = (nameField && nameField.value) || profile.orchestrator.agent;
   const descField = getField(parsed.frontmatter, "description");
-  const description = profile.orchestrator.description || (descField && descField.value) || "";
+  let description = profile.orchestrator.description || (descField && descField.value) || "";
+  description = substituteAgentNames(description, profile);
 
   const frontmatter = [
     { key: "name", value: name, rawLines: [`name: ${name}`] },
@@ -241,13 +249,24 @@ function emitOrchestratorSkill(file, profile, rulesContent) {
 // --- agents ----------------------------------------------------------------
 
 function handleAgent(file, profile, models) {
+  let { frontmatter, body } = parse(file.content);
+  const nameField = getField(frontmatter, "name");
+  const originalAgentName = nameField ? nameField.value : undefined;
+  let agentName = originalAgentName;
+
+  if (profile.orchestrator && profile.orchestrator.renameTo && originalAgentName === profile.orchestrator.agent) {
+    agentName = profile.orchestrator.renameTo;
+    frontmatter = setScalar(frontmatter, "name", agentName);
+  }
+
   let newPath = renameExtension(file.path, profile.agentFile);
+  if (profile.orchestrator && profile.orchestrator.renameTo && agentBaseName(file.path, profile) === profile.orchestrator.agent) {
+    const ext = profile.agentFile.to;
+    newPath = `agents/${profile.orchestrator.renameTo}${ext}`;
+  }
   if (profile.agentDir) {
     newPath = remapDir(newPath, "agents/", profile.agentDir);
   }
-  let { frontmatter, body } = parse(file.content);
-  const nameField = getField(frontmatter, "name");
-  const agentName = nameField ? nameField.value : undefined;
 
   // Capture mode from user-invocable before it is stripped: the user-invocable
   // entry agent becomes a `primary` agent, every worker a `subagent`.
@@ -278,8 +297,10 @@ function handleAgent(file, profile, models) {
     body = substituteProse(body, profile.toolMap);
   }
 
-  if (profile.model && agentName) {
-    const resolved = resolveModel(agentName, profile.id, models);
+  body = substituteAgentNames(body, profile);
+
+  if (profile.model && originalAgentName) {
+    const resolved = resolveModel(originalAgentName, profile.id, models);
     if (resolved !== OMIT) {
       frontmatter = Array.isArray(resolved)
         ? setArray(frontmatter, "model", resolved)
@@ -351,6 +372,20 @@ function handleCommand(file, profile) {
     }
   }
 
+  // Update command routing if orchestrator is renamed:
+  if (profile.orchestrator && profile.orchestrator.renameTo) {
+    const agentField = getField(frontmatter, "agent");
+    if (agentField && agentField.value === profile.orchestrator.agent) {
+      frontmatter = setScalar(frontmatter, "agent", profile.orchestrator.renameTo);
+    }
+  }
+
+  body = substituteAgentNames(body, profile);
+  const descField = getField(frontmatter, "description");
+  if (descField && descField.value) {
+    frontmatter = setScalar(frontmatter, "description", substituteAgentNames(descField.value, profile));
+  }
+
   return { path: newPath, content: serialize({ frontmatter, body }) };
 }
 
@@ -417,6 +452,7 @@ function toInstructionFile(file, profile) {
   if (profile.toolMap) {
     body = substituteProse(body, profile.toolMap);
   }
+  body = substituteAgentNames(body, profile);
   frontmatter = setScalar(frontmatter, "applyTo", `"${profile.rules.applyTo}"`);
   const base = file.path.slice("rules/".length);
   return { path: `${profile.rules.dir}/${base}`, content: serialize({ frontmatter, body }) };
@@ -432,6 +468,7 @@ function toInstructionConfigFile(file, profile) {
   if (profile.toolMap) {
     body = substituteProse(body, profile.toolMap);
   }
+  body = substituteAgentNames(body, profile);
   const base = file.path.slice("rules/".length);
   return { path: `${profile.rules.dir}/${base}`, content: body.replace(/^\s+/, "") };
 }
@@ -585,6 +622,15 @@ function substituteProse(body, toolMap) {
   }
 
   return out;
+}
+
+function substituteAgentNames(body, profile) {
+  if (profile.orchestrator && profile.orchestrator.renameTo) {
+    const from = profile.orchestrator.agent;
+    const to = profile.orchestrator.renameTo;
+    return body.replace(new RegExp(escapeRegExp(from), "g"), to);
+  }
+  return body;
 }
 
 module.exports = { transform };

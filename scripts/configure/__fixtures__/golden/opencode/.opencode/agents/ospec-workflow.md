@@ -1,5 +1,5 @@
 ---
-name: sdd-orchestrator
+name: ospec-workflow
 description: Coordinates the SDD workflow and delegates phase work.
 tools:
   read: true

@@ -1,6 +1,6 @@
 ---
 description: Run or continue apply for an OpenSpec change.
-agent: sdd-orchestrator
+agent: ospec-workflow
 ---
 
 Route this command to the orchestrator.

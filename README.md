@@ -100,11 +100,23 @@ Agregá `--dry-run` para ver qué copiaría sin escribir:
 
 ### opencode
 
-Mismo modelo: build + sync a la raíz del repo destino (`.opencode/`, `opencode.json`, `skills/`, `scripts/`):
+El target `opencode` permite dos modalidades de uso. En ambas modalidades, el agente principal `sdd-orchestrator` se renombra automáticamente a `ospec-workflow` para integrarse de forma nativa con la interfaz de OpenCode.
+
+**Opción A: Local / Proyecto específico**
+
+Copia el árbol de agentes y configuración en la raíz del repositorio de destino (`.opencode/`, `opencode.json`, `skills/`, `scripts/`):
 
 ```powershell
-npm run install:opencode -- ../mi-proyecto   # build + copia el árbol .opencode/
+npm run install:opencode -- ../mi-proyecto   # build + copia el árbol
 npm run build:opencode                        # solo build a dist/opencode
+```
+
+**Opción B: Global**
+
+Registra todos los agentes, comandos, instrucciones y plugins de manera global en el directorio de configuración del usuario (`~/.config/opencode/`) y fusiona el archivo `opencode.json` (MCP y configs) de forma automática. De esta forma, el agente `ospec-workflow` (accesible presionando Tab o escribiendo su nombre) estará disponible en cualquier proyecto abierto:
+
+```powershell
+npm run install:global:opencode              # build + copia global + merge config
 ```
 
 Consulta la [guía de instalación](docs/plugin-installation.md) para instalación remota, desarrollo local, marketplace local de Claude Code y requisitos de confianza.

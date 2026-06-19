@@ -25,6 +25,11 @@ module.exports = {
   id: "opencode",
   layout: "dot-opencode",
 
+  orchestrator: {
+    agent: "sdd-orchestrator",
+    renameTo: "ospec-workflow",
+  },
+
   // Path remapping per category. Source dir -> output dir; extension collapses to .md.
   agentFile: { from: ".agent.md", to: ".md" },
   agentDir: ".opencode/agents",

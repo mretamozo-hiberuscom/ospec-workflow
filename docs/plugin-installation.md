@@ -78,8 +78,11 @@ node scripts/configure/claude-marketplace.js
 # GitHub Copilot CLI / coding agent
 node scripts/configure/cli.js --target github-copilot --out dist/github-copilot
 
-# opencode
+# opencode (construcción local)
 node scripts/configure/cli.js --target opencode --out dist/opencode
+
+# opencode (instalación global)
+npm run install:global:opencode
 
 # Omitir validacion para inspeccion rapida
 node scripts/configure/cli.js --target claude --out dist/claude --no-validate
@@ -91,7 +94,7 @@ node scripts/configure/cli.js --target claude --out dist/claude --no-validate
 | `claude` | Renombra `*.agent.md`/`*.prompt.md` a `*.md`, reestructura el manifiesto y los hooks, sustituye nombres de herramientas, reescribe variables de comando (`${input}` -> `$ARGUMENTS`; `${input:name}` -> `$name` + `arguments:`), incorpora `rules/` y emite el orquestador como **skill** (`skills/sdd-orchestrator/SKILL.md`). Genera `dist/claude/`, pensado para carga temporal con `claude --plugin-dir`. | `claude plugin validate --strict dist/claude` |
 | `claude-marketplace` | Envuelve el arbol Claude en un marketplace local instalable. Genera `dist/claude-marketplace/.claude-plugin/marketplace.json` y coloca el plugin en `dist/claude-marketplace/plugins/ospec-workflow/`. | `claude plugin validate dist/claude-marketplace` y `claude plugin validate --strict dist/claude-marketplace/plugins/ospec-workflow` |
 | `github-copilot` | Genera layout `.github/` con instrucciones, prompts, chatmodes, MCP y runtime de hooks para GitHub Copilot CLI / coding agent. | `scripts/configure/validate-github-copilot.js`, ejecutado por la validacion de perfiles y por `node scripts/check.js`. |
-| `opencode` | Genera layout `.opencode/` (`agents/`, `commands/`, `instructions/`, `plugins/ospec.js`) mas `opencode.json` (schema + `mcp` + `instructions`) para opencode. Sin hooks de shell: el runtime se puentea con un plugin JS. | `scripts/configure/validate-opencode.js`, ejecutado por la validacion de perfiles y por `node scripts/check.js`. |
+| `opencode` | Genera layout `.opencode/` (`agents/`, `commands/`, `instructions/`, `plugins/ospec.js`) mas `opencode.json` (schema + `mcp` + `instructions`) para opencode. Renombra el agente principal `sdd-orchestrator` a `ospec-workflow` para su visualización nativa. Sin hooks de shell: el runtime se puentea con un plugin JS. | `scripts/configure/validate-opencode.js`, ejecutado por la validacion de perfiles y por `node scripts/check.js`. |
 
 Cada arbol generado es **autocontenido**: el generador sigue los `require` desde los hooks e incluye su runtime (`scripts/hooks/` + sus dependencias de `scripts/lib/`), sin tests ni el propio generador.
 
@@ -112,7 +115,8 @@ En Claude Code hay dos salidas distintas:
 - **Claude Code temporal**: genera `dist/claude/` y cargalo con `claude --plugin-dir dist/claude`. Esta via solo aplica a la sesion actual.
 - **Claude Code persistente**: genera `dist/claude-marketplace/`, registra ese marketplace local y despues instala `ospec-workflow@ospec-tools`.
 - **GitHub Copilot CLI / coding agent**: genera `dist/github-copilot/` y copia su contenido (`.github/`, `.mcp.json` y `scripts/`) en la raiz del repo destino.
-- **opencode**: genera `dist/opencode/` y copia su contenido (`.opencode/`, `opencode.json`, `skills/` y `scripts/`) en la raiz del repo destino. opencode descubre agentes/comandos/instrucciones bajo `.opencode/` y lee `opencode.json` (MCP + instructions); el plugin `.opencode/plugins/ospec.js` puentea el runtime de hooks.
+- **opencode (Local/Proyecto)**: genera `dist/opencode/` y copia su contenido (`.opencode/`, `opencode.json`, `skills/` y `scripts/`) en la raiz del repo destino. opencode descubre agentes/comandos/instrucciones bajo `.opencode/` y lee `opencode.json` (MCP + instructions); el plugin `.opencode/plugins/ospec.js` puentea el runtime de hooks.
+- **opencode (Global)**: compila, copia y registra todos los agentes, comandos, instrucciones y plugins en el directorio global del usuario (`~/.config/opencode/`), fusionando la configuración de MCP en `opencode.json` de manera automática y permanente para cualquier proyecto. En ambos casos de opencode, el agente principal es renombrado a `ospec-workflow`.
 
 ### Claude Code: prueba temporal de una sesion
 
@@ -252,6 +256,38 @@ dist/github-copilot/
 
 Verifica que los archivos `.github/` generados quedan en la raiz del repo destino y que los scripts de hooks viajan junto al runtime necesario.
 
+### opencode
+
+El target `opencode` permite dos modalidades de instalación: local (por proyecto) y global (para toda la máquina del usuario). En ambas modalidades, el agente principal `sdd-orchestrator` se renombra automáticamente a `ospec-workflow` para integrarse con la interfaz de OpenCode y permitir el autocompletado con la tecla Tab.
+
+#### Instalación local (por proyecto)
+
+Construye y sincroniza la carpeta del plugin directamente en la raíz de tu proyecto de destino:
+
+```powershell
+npm run install:opencode -- ../mi-proyecto
+```
+
+Esto copiará el árbol `.opencode/`, `opencode.json`, `skills/` y `scripts/` (incluyendo los scripts de los hooks y el binario compiler hook `ospec-hooks.exe` o `ospec-hooks` si estuviera compilado en `release/dist/`).
+
+#### Instalación global (para cualquier proyecto)
+
+Instala el plugin de forma permanente a nivel de usuario:
+
+```powershell
+npm run install:global:opencode
+```
+
+Este instalador idempotente realiza los siguientes pasos:
+1. Compila el target `opencode` en `dist/opencode/`.
+2. Copia el binario compiler hook `ospec-hooks` apropiado para la arquitectura en `release/dist/` (si existe).
+3. Copia todas las carpetas generadas (`agents/`, `commands/`, `instructions/`, `plugins/`, `skills/`, `scripts/`, y `release/`) al directorio global de configuración de OpenCode:
+   - **Windows**: `C:\Users\<Usuario>\.config\opencode\`
+   - **Linux/macOS**: `~/.config/opencode/`
+4. Fusiona dinámicamente las configuraciones del archivo `opencode.json` (incluyendo servidores MCP como `context7` y `markitdown`) con el archivo `opencode.json` global ya existente, y añade el patrón global `instructions/*.md` para registrar las instrucciones.
+
+Esto permite que `ospec-workflow` y todos sus comandos/skills estén disponibles al presionar **Tab** en cualquier repositorio abierto en OpenCode.
+
 ## Como verificar que cargaron los agentes y los skills
 
 Empieza por los puntos de entrada visibles y luego inspecciona mas detalle solo si falta algo.
@@ -262,6 +298,8 @@ Empieza por los puntos de entrada visibles y luego inspecciona mas detalle solo 
 | Claude Code temporal | Al lanzar con `claude --plugin-dir dist/claude`, `ospec-workflow` aparece en `/plugin` durante esa sesion. |
 | Claude Code persistente | Al instalar desde `ospec-workflow@ospec-tools`, el plugin aparece en `/plugin` sin usar `--plugin-dir`. |
 | GitHub Copilot CLI / coding agent | El repo destino contiene `.github/`, `.mcp.json` y `scripts/` generados. |
+| opencode (Local) | El repo destino contiene `.opencode/`, `opencode.json`, `skills/` y `scripts/`. Al presionar Tab o escribir su nombre, el agente `ospec-workflow` aparece en la interfaz. |
+| opencode (Global) | La carpeta global (`~/.config/opencode/`) contiene `agents/`, `commands/`, `instructions/`, `plugins/`, `skills/` y `scripts/`, y `opencode.json` tiene la configuración fusionada. En cualquier repo, al presionar Tab, el agente `ospec-workflow` aparece en la interfaz. |
 
 En Claude Code, si algo no aparece despues de instalar el plugin persistente, ejecuta:
 
