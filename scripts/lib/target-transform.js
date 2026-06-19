@@ -135,10 +135,21 @@ function renameExtension(path, { from, to }) {
   return from === to ? path : path.slice(0, path.length - from.length) + to;
 }
 
+// Parse a tracked { path, content } file as JSON, attaching the source path to
+// any syntax error so a malformed config names the offending file instead of
+// aborting the whole transform with an opaque SyntaxError.
+function parseJsonFile(file) {
+  try {
+    return JSON.parse(file.content);
+  } catch (err) {
+    throw new Error(`${file.path}: invalid JSON: ${err.message}`);
+  }
+}
+
 // --- manifest --------------------------------------------------------------
 
 function reshapeManifest(file, profile) {
-  const obj = JSON.parse(file.content);
+  const obj = parseJsonFile(file);
   const { omitFields = [], dropFields = [] } = profile.manifest;
 
   for (const key of omitFields) {
@@ -156,7 +167,7 @@ function reshapeManifest(file, profile) {
 // --- hooks -----------------------------------------------------------------
 
 function nestHooks(file) {
-  const obj = JSON.parse(file.content);
+  const obj = parseJsonFile(file);
   const events = obj.hooks || {};
   const nested = {};
 
@@ -172,7 +183,7 @@ function nestHooks(file) {
 // bash, powershell, timeoutSec } ] } }. Events without a Copilot equivalent are
 // dropped; the plugin-root path variable is stripped to a repo-relative command.
 function copilotHooks(file, profile) {
-  const obj = JSON.parse(file.content);
+  const obj = parseJsonFile(file);
   const events = obj.hooks || {};
   const eventMap = profile.hooks.eventMap || {};
   const stripVar = profile.hooks.stripPathVar;
@@ -498,7 +509,7 @@ function synthesizeConfig(files, profile) {
   if (profile.config.mcpFrom) {
     const mcpFile = files.find((file) => file.path === profile.config.mcpFrom);
     if (mcpFile) {
-      const servers = transformMcpServers(JSON.parse(mcpFile.content).mcpServers);
+      const servers = transformMcpServers(parseJsonFile(mcpFile).mcpServers);
       if (Object.keys(servers).length > 0) {
         config.mcp = servers;
       }
@@ -582,7 +593,7 @@ function mapVarValuesWith(obj, fn) {
 // are not expected there). Returns a fresh { path, content } — input file
 // is never mutated.
 function normalizeMcpPlaceholders(file) {
-  const obj = JSON.parse(file.content);
+  const obj = parseJsonFile(file);
   for (const server of Object.values(obj.mcpServers || {})) {
     if (!server || typeof server !== "object") continue;
     if (server.env) server.env = mapVarValuesWith(server.env, toEnvExpansion);

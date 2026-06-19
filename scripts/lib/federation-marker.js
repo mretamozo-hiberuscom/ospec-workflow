@@ -3,6 +3,7 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { isDeepStrictEqual } = require("node:util");
+const { writeFileAtomic } = require("./atomic-write.js");
 
 // Write-only federation marker module (C1). `openspec/federation.member.yaml`
 // is the canonical, version-controlled source of truth for a member repo.
@@ -448,10 +449,10 @@ async function enroll(memberDir, data) {
 
   const updatedAt = new Date().toISOString();
   const serialized = serializeMarker({ ...incoming, updated_at: updatedAt });
-  const tempPath = `${markerPath}.tmp`;
 
-  await fs.writeFile(tempPath, serialized);
-  await fs.rename(tempPath, markerPath);
+  // Atomic temp+rename with guaranteed temp cleanup (incl. Windows EPERM
+  // fallback) so a failed rename never strands a `.tmp` in the member dir.
+  await writeFileAtomic(markerPath, serialized);
 
   return { status: "written", path: markerPath, updated_at: updatedAt };
 }

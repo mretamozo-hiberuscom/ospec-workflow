@@ -6,6 +6,7 @@ const { spawnSync } = require("node:child_process");
 
 const ospec = require("./ospec-state.js");
 const atlas = require("./workspace-atlas.js");
+const { writeFileAtomic } = require("./atomic-write.js");
 const {
   ARTIFACT_STORE_MODES,
   DEFAULT_ARTIFACT_STORE_MODE,
@@ -158,8 +159,9 @@ function createWorkspaceFederatedStore(workspace, { execGitSync = spawnSync } = 
       .map((entry) => entry.marker);
     const { atlas: regenerated } = atlas.mergeMarkersIntoAtlas(markers);
 
-    await fs.mkdir(path.dirname(atlasPath), { recursive: true });
-    await fs.writeFile(atlasPath, atlas.serializeAtlas(regenerated));
+    // Atomic write so a crash mid-regeneration can't leave a truncated
+    // workspace.yaml that still passes the structural corruption check.
+    await writeFileAtomic(atlasPath, atlas.serializeAtlas(regenerated));
 
     return regenerated;
   }

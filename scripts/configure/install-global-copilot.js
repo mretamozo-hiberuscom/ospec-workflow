@@ -77,7 +77,14 @@ function main() {
     }
   }
 
-  const generatedConfig = JSON.parse(fs.readFileSync(generatedConfigPath, "utf8"));
+  let generatedConfig;
+  try {
+    generatedConfig = JSON.parse(fs.readFileSync(generatedConfigPath, "utf8"));
+  } catch (err) {
+    throw new Error(
+      `Could not read generated .mcp.json at ${generatedConfigPath}: ${err.message}`,
+    );
+  }
 
   // Merge MCP servers
   globalConfig.mcpServers = globalConfig.mcpServers || {};
@@ -91,4 +98,9 @@ function main() {
   process.stdout.write("\nDone. Global installation completed successfully.\n");
 }
 
-main();
+try {
+  main();
+} catch (err) {
+  process.stderr.write(`\nGlobal install failed: ${err.message}\n`);
+  process.exit(1);
+}

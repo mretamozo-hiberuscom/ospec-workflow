@@ -349,6 +349,12 @@ async function loadStatus(statusPath, atlas) {
     const content = await fs.readFile(statusPath, "utf8");
     return parseStatus(content, atlas);
   } catch (error) {
+    // Only a missing file means "no status yet". Any other I/O error (EACCES,
+    // EBUSY, disk error) must not be swallowed into an empty state — that would
+    // silently reset every member to pending and re-run completed baselines.
+    if (error.code !== "ENOENT") {
+      throw error;
+    }
     return parseStatus("", atlas);
   }
 }
