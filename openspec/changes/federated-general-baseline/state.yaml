@@ -1,0 +1,36 @@
+change: federated-general-baseline
+program: federation (C4)
+depends_on:
+  - federated-foundation-orchestration   # C3 (archived 2026-06-19)
+created_at: "2026-06-19"
+branch: main
+
+classification: normal
+classification_confidence: deterministic
+classification_rationale: >
+  Introduces capability to detect and document shared base configurations and
+  common patterns across multiple repositories in a federated workspace.
+
+route:
+  intended_route: standard
+  actual_route: standard
+  route_rationale: >
+    Standard route selected for normal classification.
+  validated: true
+  validation_errors: []
+
+session:
+  execution_mode: interactive
+  delivery_strategy: ask-on-risk
+  reply_language: es
+
+phases:
+  explore:
+    status: done
+    artifact: "openspec/changes/federated-general-baseline/exploration.md"
+    completed_at: "2026-06-19T02:02:00Z"
+  propose:
+    status: pending
+    completed_at: null
+
+approvals: []
