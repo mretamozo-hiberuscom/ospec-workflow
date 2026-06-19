@@ -125,6 +125,13 @@ async function fileExists(target) {
   }
 }
 
+/**
+ * Classifies a member repository along four dimensions: type, layer,
+ * brownfield/greenfield, and init-done.
+ *
+ * @param {string} memberRoot - Absolute path to the member repository root.
+ * @returns {Promise<{type: string|null, layer: string|null, brownfield: boolean, initDone: boolean, warnings: string[]}>}
+ */
 async function classifyMember(memberRoot) {
   const memberName = path.basename(memberRoot);
   const rootEntries = await readRootEntries(memberRoot);
@@ -184,6 +191,16 @@ function renderWorkspaceMap(containerId, rows) {
 
 // --- explore ---------------------------------------------------------------
 
+/**
+ * Builds the marker data object for a discovered member. The marker follows
+ * the schema defined in the `federation-markers` spec with `origin: "explore"`
+ * and an explicit empty roster.
+ *
+ * @param {string} containerId - The workspace container identifier.
+ * @param {string} memberDir - The member directory name (relative to container root).
+ * @param {{type: string|null, layer: string|null}} classification - Classification result.
+ * @returns {{federation: {id: string}, member: object, roster: Array, origin: string}}
+ */
 function buildMemberData(containerId, memberDir, classification) {
   const member = { id: memberDir, role: "secondary" };
 
@@ -195,9 +212,20 @@ function buildMemberData(containerId, memberDir, classification) {
     member.layer = classification.layer;
   }
 
-  return { federation: { id: containerId }, member, origin: "explore" };
+  return { federation: { id: containerId }, member, roster: [], origin: "explore" };
 }
 
+/**
+ * Executes the workspace-explore phase: discovers members at depth 1,
+ * classifies each one, enrolls canonical markers (idempotently via `enroll`),
+ * then regenerates the derived atlas cache and a human-readable workspace map.
+ *
+ * Per-member enroll failures are recorded as `pending` and never abort the run.
+ * Marker schema is defined in the `federation-markers` spec.
+ *
+ * @param {string} containerRoot - Absolute path to the workspace container root.
+ * @returns {Promise<{status: string, members: object[], artifacts: string[], warnings: string[]}>}
+ */
 async function explore(containerRoot) {
   const discovered = await scanMemberMarkers(containerRoot);
   const scanWarnings = [...(discovered.warnings || [])];

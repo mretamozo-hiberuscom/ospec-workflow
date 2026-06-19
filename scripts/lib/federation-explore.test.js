@@ -552,3 +552,21 @@ test("3.1.5 · explore integration S1 + S3: brownfield member marker has origin:
   assert.equal(await exists(path.join(root, "openspec", "workspace.yaml")), true);
   assert.equal(await exists(path.join(root, "openspec", "workspace-map.md")), true);
 });
+
+test("3.1.6 · explore marker includes explicit roster: [] (S1 hardening)", async (t) => {
+  const root = await makeContainer(t);
+  await makeMember(root, "svc-api", {
+    files: {
+      "package.json": '{ "name": "svc-api" }\n',
+    },
+  });
+
+  await explore(root);
+
+  const marker = await readMarker(path.join(root, "svc-api"));
+  assert.equal(marker.origin, "explore");
+  assert.ok(Array.isArray(marker.roster), "roster must be an array");
+  assert.equal(marker.roster.length, 0, "explore roster must be empty");
+  assert.equal(marker.member.remote, undefined, "explore markers must not have member.remote");
+});
+

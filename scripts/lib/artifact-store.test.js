@@ -365,7 +365,78 @@ test("workspace-federated: regenerates and warns when the cache is corrupt", asy
   assert.ok(warnings.some((warning) => /corrupt/i.test(warning)));
 });
 
-test("workspace-federated: warns but keeps loading when workspace.yaml is git-tracked", async (t) => {
+test("workspace-federated: empty-but-valid workspace.yaml is NOT corrupt", async (t) => {
+  const workspace = await createWorkspace(t);
+  await writeAtlas(workspace, "members:\ncontracts:\n");
+
+  const warnings = captureWarn(t);
+  const store = createArtifactStore({ mode: "workspace-federated", workspace });
+
+  // Empty workspace is legitimate — isInitialized returns false (no members)
+  // but no corruption warning should be emitted.
+  assert.equal(await store.isInitialized(), false);
+  assert.ok(!warnings.some((warning) => /corrupt/i.test(warning)));
+});
+
+test("workspace-federated: members-only header is structurally valid", async (t) => {
+  const workspace = await createWorkspace(t);
+  await writeAtlas(workspace, "members:\n");
+
+  const warnings = captureWarn(t);
+  const store = createArtifactStore({ mode: "workspace-federated", workspace });
+
+  assert.equal(await store.isInitialized(), false);
+  assert.ok(!warnings.some((warning) => /corrupt/i.test(warning)));
+});
+
+test("workspace-federated: warns when workspace.yaml is git-tracked (mock)", async (t) => {
+  const workspace = await createWorkspace(t);
+  await writeAtlas(
+    workspace,
+    ["members:", "  - id: api", "    path: member-api"].join("\n"),
+  );
+
+  const mockExecGitSync = () => ({
+    status: 0,
+    stdout: "openspec/workspace.yaml\n",
+  });
+
+  const warnings = captureWarn(t);
+  const store = createArtifactStore({
+    mode: "workspace-federated",
+    workspace,
+    execGitSync: mockExecGitSync,
+  });
+  const described = await store.describeWorkspace();
+
+  assert.ok(described && described.members.length === 1);
+  assert.ok(warnings.some((warning) => /git rm --cached/.test(warning)));
+});
+
+test("workspace-federated: no warning when workspace.yaml is NOT git-tracked (mock)", async (t) => {
+  const workspace = await createWorkspace(t);
+  await writeAtlas(
+    workspace,
+    ["members:", "  - id: api", "    path: member-api"].join("\n"),
+  );
+
+  const mockExecGitSync = () => ({
+    status: 0,
+    stdout: "",
+  });
+
+  const warnings = captureWarn(t);
+  const store = createArtifactStore({
+    mode: "workspace-federated",
+    workspace,
+    execGitSync: mockExecGitSync,
+  });
+  await store.describeWorkspace();
+
+  assert.ok(!warnings.some((warning) => /git rm --cached/.test(warning)));
+});
+
+test("workspace-federated: git-tracked warning (integration smoke)", async (t) => {
   if (!gitAvailable()) {
     t.skip("git is not available");
     return;
@@ -398,3 +469,4 @@ test("workspace-federated: warns but keeps loading when workspace.yaml is git-tr
   assert.ok(described && described.members.length === 1);
   assert.ok(warnings.some((warning) => /git rm --cached/.test(warning)));
 });
+

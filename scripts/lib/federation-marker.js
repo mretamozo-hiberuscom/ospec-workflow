@@ -231,6 +231,16 @@ function parseMarkerBlock(lines, startIndex, baseIndent) {
   return { value: block, nextIndex: cursor };
 }
 
+/**
+ * Parses the constrained YAML subset used by `openspec/federation.member.yaml`
+ * markers into a plain object. Supports nested blocks (`federation`, `member`),
+ * inline-map list items for `provides`/`roster`, and top-level scalars.
+ *
+ * @param {string} content - Raw YAML content of the marker file.
+ * @returns {object} Parsed marker object with `federation`, `member`, `roster`,
+ *   `origin`, and `updated_at` fields.
+ * @throws {Error} When content is empty or not a string.
+ */
 function parseMarker(content) {
   if (typeof content !== "string" || !content.trim()) {
     throw new Error("empty marker content");
@@ -276,15 +286,19 @@ function serializeBlock(lines, block, indent) {
     }
 
     if (Array.isArray(value)) {
-      lines.push(`${pad}${key}:`);
+      if (value.length === 0) {
+        lines.push(`${pad}${key}: []`);
+      } else {
+        lines.push(`${pad}${key}:`);
 
-      for (const item of value) {
-        if (item !== null && typeof item === "object" && !Array.isArray(item)) {
-          lines.push(`${pad}  - ${formatInlineMap(item)}`);
-        } else if (Array.isArray(item)) {
-          lines.push(`${pad}  - ${formatInlineList(item)}`);
-        } else {
-          lines.push(`${pad}  - ${formatScalar(item)}`);
+        for (const item of value) {
+          if (item !== null && typeof item === "object" && !Array.isArray(item)) {
+            lines.push(`${pad}  - ${formatInlineMap(item)}`);
+          } else if (Array.isArray(item)) {
+            lines.push(`${pad}  - ${formatInlineList(item)}`);
+          } else {
+            lines.push(`${pad}  - ${formatScalar(item)}`);
+          }
         }
       }
     } else if (typeof value === "object") {
@@ -296,6 +310,14 @@ function serializeBlock(lines, block, indent) {
   }
 }
 
+/**
+ * Serializes a marker data object into the constrained YAML subset. Fields are
+ * emitted in insertion order except `updated_at`, which is always written last
+ * as the merge timestamp. Empty arrays are serialized inline as `key: []`.
+ *
+ * @param {object} data - Marker data object (typically from `enroll` or `parseMarker`).
+ * @returns {string} YAML string with trailing newline.
+ */
 function serializeMarker(data) {
   const source = data && typeof data === "object" ? data : {};
   const lines = [];
@@ -308,15 +330,19 @@ function serializeMarker(data) {
     }
 
     if (Array.isArray(value)) {
-      lines.push(`${key}:`);
+      if (value.length === 0) {
+        lines.push(`${key}: []`);
+      } else {
+        lines.push(`${key}:`);
 
-      for (const item of value) {
-        if (item !== null && typeof item === "object" && !Array.isArray(item)) {
-          lines.push(`  - ${formatInlineMap(item)}`);
-        } else if (Array.isArray(item)) {
-          lines.push(`  - ${formatInlineList(item)}`);
-        } else {
-          lines.push(`  - ${formatScalar(item)}`);
+        for (const item of value) {
+          if (item !== null && typeof item === "object" && !Array.isArray(item)) {
+            lines.push(`  - ${formatInlineMap(item)}`);
+          } else if (Array.isArray(item)) {
+            lines.push(`  - ${formatInlineList(item)}`);
+          } else {
+            lines.push(`  - ${formatScalar(item)}`);
+          }
         }
       }
     } else if (typeof value === "object") {
@@ -379,6 +405,19 @@ const ORIGIN_PRECEDENCE = {
   manual: 3,
 };
 
+/**
+ * The ONLY sanctioned write into a member repo. Writes (or updates)
+ * `openspec/federation.member.yaml` in the target member directory.
+ *
+ * Idempotent: calling with identical data does NOT rewrite the file and
+ * does NOT refresh `updated_at`. Origin precedence is respected: a higher-
+ * precedence origin on the existing marker is preserved over a lower one.
+ *
+ * @param {string} memberDir - Absolute path to the member repository root.
+ * @param {object} data - Marker data to write (without `updated_at`).
+ * @returns {Promise<{status: string, path: string, updated_at: string}>}
+ *   `status` is `"written"` on change, `"fresh"` when content was identical.
+ */
 async function enroll(memberDir, data) {
   const openspecDir = path.join(memberDir, "openspec");
   const markerPath = path.join(memberDir, MARKER_RELATIVE_PATH);

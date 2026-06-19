@@ -4,7 +4,10 @@
 
 Defines the `workspace-explore` phase: discovery of federated member repos inside a
 workspace container, classification of each member by type/layer/brownfield-greenfield/
-init-done, and emission of canonical markers, atlas cache, and a human-readable map.
+init-done, and writing of member markers (via `enroll`), atlas cache, and a
+human-readable map. The marker schema and field definitions are authoritative in the
+`federation-markers` spec; this spec covers only the explore-phase behavior that
+produces and consumes those markers.
 No cross-cutting authoring or baseline orchestration is in scope (C2+).
 
 ---
@@ -58,7 +61,8 @@ workspace container. Detection MUST NOT recurse beyond depth 1.
 ### Requirement: Member Classification
 
 Each discovered member MUST be classified along four dimensions and the results MUST
-be recorded in the member's marker via `enroll`:
+be recorded in the member's marker via `enroll` (see `federation-markers` spec for
+marker schema and field constraints):
 
 | Dimension | Values | Derivation |
 |-----------|--------|------------|
@@ -97,14 +101,16 @@ a per-member warning and MAY set the field to `null` pending user clarification.
 
 | Artifact | Location | Notes |
 |----------|----------|-------|
-| Member marker | `{member-dir}/openspec/federation.member.yaml` per member | Written exclusively via `enroll` (see `federation-markers` spec) |
-| Atlas cache | `openspec/workspace.yaml` in the container root | Regenerated after all markers are written |
+| Member marker | `{member-dir}/openspec/federation.member.yaml` per member | Written exclusively via `enroll`; schema defined in `federation-markers` spec |
+| Atlas cache | `openspec/workspace.yaml` in the container root | Derived cache regenerated after all markers are written; see `federation-markers` spec §Atlas as Derived Cache |
 | Map markdown | `openspec/workspace-map.md` in the container root | Human-readable list of members with classification, state, and warnings |
 
-Markers MUST be written via `enroll` only; direct file writes are prohibited. Atlas
-cache regeneration MUST occur after all `enroll` calls complete. The map markdown MUST
-include every discovered member regardless of whether its enroll succeeded, recording
-failures inline as warnings.
+Markers MUST be written via `enroll` only; direct file writes are prohibited. The
+marker schema, enroll idempotency rules, and `updated_at` semantics are defined
+authoritatively in the `federation-markers` spec. Atlas cache regeneration MUST occur
+after all `enroll` calls complete. The map markdown MUST include every discovered
+member regardless of whether its enroll succeeded, recording failures inline as
+warnings.
 
 #### Scenario: All members succeed — three artifacts emitted
 

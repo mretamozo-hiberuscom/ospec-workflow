@@ -119,6 +119,14 @@ function parseListOfMaps(content, sectionName) {
   return items;
 }
 
+/**
+ * Parses the constrained YAML subset of `openspec/workspace.yaml` (the derived
+ * atlas cache). Extracts `members` and `contracts` lists. Intentionally lenient:
+ * never throws, returns empty collections for invalid content.
+ *
+ * @param {string} content - Raw YAML content of the atlas file.
+ * @returns {{members: object[], contracts: object[]}} Parsed atlas.
+ */
 function parseAtlas(content) {
   if (typeof content !== "string" || !content.trim()) {
     return { members: [], contracts: [] };
@@ -149,6 +157,14 @@ async function isReachable(memberRoot) {
   }
 }
 
+/**
+ * Resolves atlas member entries to their absolute filesystem paths and checks
+ * whether each member's openspec directory is reachable (has a `changes/` dir).
+ *
+ * @param {string} workspace - Absolute path to the workspace container root.
+ * @param {{members: object[]}} atlas - Parsed atlas with member entries.
+ * @returns {Promise<Array<{id: string, root: string, reachable: boolean}>>}
+ */
 async function resolveMembers(workspace, atlas) {
   const base = path.resolve(workspace);
   const resolved = [];
@@ -170,6 +186,15 @@ async function resolveMembers(workspace, atlas) {
   return resolved;
 }
 
+/**
+ * Computes the full impact set of a provider member from the atlas contracts.
+ * The impact set is `{memberId} ∪ ⋃ consumers` across all contracts where the
+ * member is the provider.
+ *
+ * @param {{contracts: object[]}} atlas - Parsed atlas with contract entries.
+ * @param {string} memberId - The provider `member.id` to compute impact for.
+ * @returns {Set<string>} Set of affected member IDs.
+ */
 function computeImpact(atlas, memberId) {
   const affected = new Set([memberId]);
 
@@ -440,6 +465,15 @@ function parseGitmodulesPaths(content) {
 // read). The single security invariant lives here: a candidate is contained
 // only when it resolves strictly below `containerRoot`. The exact-equal-to-root
 // degenerate case is rejected so a member can never be the root itself.
+/**
+ * Lexical containment guard for member discovery paths. Returns `true` when
+ * `candidateAbs` resolves strictly below `containerRoot` (not equal to it).
+ * Does not resolve symlinks — use `isRealPathWithinRoot` for physical checks.
+ *
+ * @param {string} containerRoot - Absolute path to the container root.
+ * @param {string} candidateAbs - Absolute path to the candidate member.
+ * @returns {boolean} `true` if the candidate is contained within root.
+ */
 function isWithinRoot(containerRoot, candidateAbs) {
   const root = path.resolve(containerRoot);
   const candidate = path.resolve(candidateAbs);
@@ -505,6 +539,17 @@ async function isRealPathWithinRoot(containerRoot, candidateAbs) {
   return realCandidate.startsWith(realRoot + path.sep);
 }
 
+/**
+ * Scans the container root for member repositories at depth 1, reads their
+ * `openspec/federation.member.yaml` markers, and returns the results. Sources
+ * are unioned from `.gitmodules` paths and `.git`-containing directories.
+ *
+ * Containment guards (lexical + symlink) prevent out-of-root reads/writes.
+ * Results carry a non-enumerable `warnings` property with traversal warnings.
+ *
+ * @param {string} containerRoot - Absolute path to the workspace container root.
+ * @returns {Promise<Array<{memberDir: string, marker?: object, error?: string, warning?: string}>>}
+ */
 async function scanMemberMarkers(containerRoot) {
   const memberDirs = new Set();
   const traversalWarnings = [];
@@ -681,6 +726,15 @@ function considerCandidate(winners, warnings, id, candidate) {
   }
 }
 
+/**
+ * Merges an array of parsed member markers into a unified atlas using union +
+ * latest-wins semantics. When the same `member.id` appears in multiple markers,
+ * the entry with the latest `updated_at` wins. Equal timestamps are broken by
+ * lexicographic order of the source marker's `member.id`.
+ *
+ * @param {object[]} markers - Array of parsed marker objects.
+ * @returns {{atlas: {members: object[], contracts: object[]}, warnings: string[]}}
+ */
 function mergeMarkersIntoAtlas(markers) {
   const warnings = [];
   const winners = new Map();
@@ -763,6 +817,13 @@ function formatYamlValue(value) {
   return String(value);
 }
 
+/**
+ * Serializes an atlas object (members + contracts) into the constrained YAML
+ * subset used by `openspec/workspace.yaml`.
+ *
+ * @param {{members: object[], contracts: object[]}} atlas - Atlas to serialize.
+ * @returns {string} YAML string with trailing newline.
+ */
 function serializeAtlas(atlas) {
   const members = Array.isArray(atlas && atlas.members) ? atlas.members : [];
   const contracts = Array.isArray(atlas && atlas.contracts)

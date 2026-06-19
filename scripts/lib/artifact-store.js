@@ -130,19 +130,25 @@ function createOpenSpecStore(workspace) {
   };
 }
 
-function createWorkspaceFederatedStore(workspace) {
+function createWorkspaceFederatedStore(workspace, { execGitSync = spawnSync } = {}) {
   const base = createCoordinatorSurface(workspace);
   const atlasPath = path.join(workspace, "openspec", "workspace.yaml");
 
-  // The atlas cache is corrupt when a non-empty file yields no usable content.
-  // parseAtlas is intentionally lenient (it never throws), so garbage parses to
-  // empty collections — that is the signal to regenerate from the markers.
-  function isCorruptCache(content, parsed) {
-    return (
-      Boolean(content.trim()) &&
-      parsed.members.length === 0 &&
-      parsed.contracts.length === 0
-    );
+  // The atlas cache is corrupt when a non-empty file does not contain
+  // recognizable YAML structure. `parseAtlas` is intentionally lenient (never
+  // throws), so both garbage AND valid-but-empty content parse to empty
+  // collections. Discriminate by checking for structural section headers:
+  // a file with `members:` or `contracts:` at column 0 is structurally valid
+  // (even if those sections are empty), while garbage text is not.
+  function isCorruptCache(content) {
+    if (!content.trim()) {
+      return false;
+    }
+
+    const hasStructure =
+      /^members:/m.test(content) || /^contracts:/m.test(content);
+
+    return !hasStructure;
   }
 
   async function regenerateAtlas() {
@@ -162,7 +168,7 @@ function createWorkspaceFederatedStore(workspace) {
   // when git is absent or errors (e.g. outside a repository); never mutate git.
   function warnIfGitTracked() {
     try {
-      const result = spawnSync("git", ["ls-files", "openspec/workspace.yaml"], {
+      const result = execGitSync("git", ["ls-files", "openspec/workspace.yaml"], {
         cwd: workspace,
         encoding: "utf8",
       });
@@ -196,7 +202,7 @@ function createWorkspaceFederatedStore(workspace) {
 
     let parsed = atlas.parseAtlas(content);
 
-    if (isCorruptCache(content, parsed)) {
+    if (isCorruptCache(content)) {
       console.warn(
         "openspec/workspace.yaml is corrupt; regenerating it from member markers.",
       );
@@ -280,6 +286,7 @@ function createWorkspaceFederatedStore(workspace) {
 function createArtifactStore({
   mode = DEFAULT_ARTIFACT_STORE_MODE,
   workspace = process.cwd(),
+  execGitSync,
 } = {}) {
   if (!ARTIFACT_STORE_MODES.includes(mode)) {
     throw new Error(
@@ -291,7 +298,10 @@ function createArtifactStore({
   const resolvedWorkspace = path.resolve(workspace);
 
   if (mode === "workspace-federated") {
-    return createWorkspaceFederatedStore(resolvedWorkspace);
+    return createWorkspaceFederatedStore(
+      resolvedWorkspace,
+      execGitSync ? { execGitSync } : undefined,
+    );
   }
 
   return createOpenSpecStore(resolvedWorkspace);
@@ -303,11 +313,12 @@ function createArtifactStore({
 async function createArtifactStoreFromConfig({
   workspace = process.cwd(),
   mode,
+  execGitSync,
 } = {}) {
   const resolvedWorkspace = path.resolve(workspace);
 
   if (mode) {
-    return createArtifactStore({ mode, workspace: resolvedWorkspace });
+    return createArtifactStore({ mode, workspace: resolvedWorkspace, execGitSync });
   }
 
   const config = await createArtifactStore({
@@ -320,6 +331,7 @@ async function createArtifactStoreFromConfig({
   return createArtifactStore({
     mode: resolvedMode,
     workspace: resolvedWorkspace,
+    execGitSync,
   });
 }
 
