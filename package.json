@@ -23,6 +23,7 @@
     "build:opencode": "node scripts/configure/cli.js --target opencode --out dist/opencode",
     "install:opencode": "node scripts/configure/install-target.js opencode",
     "install:global:opencode": "node scripts/configure/install-global-opencode.js",
+    "install:global:copilot": "node scripts/configure/install-global-copilot.js",
     "install:copilot": "node scripts/configure/install-target.js github-copilot"
   }
 }

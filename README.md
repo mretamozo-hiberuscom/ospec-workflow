@@ -81,22 +81,27 @@ npm run reload:claude   # build (con validación strict) — luego /reload-plugi
 
 ### GitHub Copilot CLI
 
-opencode y Copilot **no tienen marketplace ni `plugin install`**: se consumen
-copiando el árbol generado a la raíz del repo destino. Un solo comando buildea y
-sincroniza (sobrescribe) la salida en el repo destino:
+El target `github-copilot` permite dos modalidades de uso.
+
+**Opción A: Local / Proyecto específico**
+
+Copia el árbol de agentes y configuración en la raíz del repositorio de destino (`.github/`, `.mcp.json`, `skills/`, `scripts/`):
 
 ```powershell
-npm run install:copilot -- ../mi-proyecto   # build + copia .github/, .mcp.json, scripts/
-```
-
-Build solo (sin copiar), si querés inspeccionar `dist/` antes:
-
-```powershell
-npm run build:copilot
+npm run install:copilot -- ../mi-proyecto   # build + copia el árbol
+npm run build:copilot                        # solo build a dist/github-copilot
 ```
 
 Agregá `--dry-run` para ver qué copiaría sin escribir:
 `node scripts/configure/install-target.js github-copilot ../mi-proyecto --dry-run`.
+
+**Opción B: Global**
+
+Registra todos los agentes, comandos, instrucciones y plugins de manera global en el directorio de configuración del usuario (`~/.copilot/`) y fusiona la configuración MCP en `mcp-config.json` de forma automática. De esta forma, el agente `sdd-orchestrator` y sus comandos estarán disponibles en cualquier proyecto abierto:
+
+```powershell
+npm run install:global:copilot              # build + copia global + merge config
+```
 
 ### opencode
 

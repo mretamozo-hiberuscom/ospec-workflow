@@ -75,8 +75,11 @@ node scripts/configure/cli.js --target claude --out dist/claude
 # Claude Code: instalacion persistente con marketplace local
 node scripts/configure/claude-marketplace.js
 
-# GitHub Copilot CLI / coding agent
+# GitHub Copilot CLI (construcción local)
 node scripts/configure/cli.js --target github-copilot --out dist/github-copilot
+
+# GitHub Copilot CLI (instalación global)
+npm run install:global:copilot
 
 # opencode (construcción local)
 node scripts/configure/cli.js --target opencode --out dist/opencode
@@ -114,7 +117,8 @@ En Claude Code hay dos salidas distintas:
 - **VS Code**: usa el repositorio directamente (`chat.pluginLocations`), sin generar.
 - **Claude Code temporal**: genera `dist/claude/` y cargalo con `claude --plugin-dir dist/claude`. Esta via solo aplica a la sesion actual.
 - **Claude Code persistente**: genera `dist/claude-marketplace/`, registra ese marketplace local y despues instala `ospec-workflow@ospec-tools`.
-- **GitHub Copilot CLI / coding agent**: genera `dist/github-copilot/` y copia su contenido (`.github/`, `.mcp.json` y `scripts/`) en la raiz del repo destino.
+- **GitHub Copilot CLI (Local/Proyecto)**: genera `dist/github-copilot/` y copia su contenido (`.github/`, `.mcp.json` y `scripts/`) en la raiz del repo destino.
+- **GitHub Copilot CLI (Global)**: compila, copia y registra todos los agentes, prompts, instrucciones, hooks y skills en el directorio global del usuario (`~/.copilot/`), fusionando la configuración de MCP en `mcp-config.json` de manera automática y permanente para cualquier proyecto.
 - **opencode (Local/Proyecto)**: genera `dist/opencode/` y copia su contenido (`.opencode/`, `opencode.json`, `skills/` y `scripts/`) en la raiz del repo destino. opencode descubre agentes/comandos/instrucciones bajo `.opencode/` y lee `opencode.json` (MCP + instructions); el plugin `.opencode/plugins/ospec.js` puentea el runtime de hooks.
 - **opencode (Global)**: compila, copia y registra todos los agentes, comandos, instrucciones y plugins en el directorio global del usuario (`~/.config/opencode/`), fusionando la configuración de MCP en `opencode.json` de manera automática y permanente para cualquier proyecto. En ambos casos de opencode, el agente principal es renombrado a `ospec-workflow`.
 
@@ -239,13 +243,17 @@ dist/claude-marketplace/
 
 ### GitHub Copilot CLI / coding agent
 
-Genera el arbol nativo:
+El target `github-copilot` admite dos modalidades de instalación: local (por proyecto) y global (para toda la máquina del usuario).
+
+#### Instalación local (por proyecto)
+
+Genera el árbol nativo:
 
 ```powershell
 node scripts/configure/cli.js --target github-copilot --out dist/github-copilot
 ```
 
-Copia el contenido generado en la raiz del repositorio destino:
+Copia el contenido generado en la raíz del repositorio destino:
 
 ```text
 dist/github-copilot/
@@ -254,7 +262,29 @@ dist/github-copilot/
   scripts/
 ```
 
-Verifica que los archivos `.github/` generados quedan en la raiz del repo destino y que los scripts de hooks viajan junto al runtime necesario.
+O usa el instalador directo de targets:
+
+```powershell
+npm run install:copilot -- ../mi-proyecto
+```
+
+Verifica que los archivos `.github/` generados quedan en la raíz del repo destino y que los scripts de hooks viajan junto al runtime necesario.
+
+#### Instalación global (para cualquier proyecto)
+
+Instala el plugin de forma permanente a nivel de usuario:
+
+```powershell
+npm run install:global:copilot
+```
+
+Este instalador idempotente realiza los siguientes pasos:
+1. Compila el target `github-copilot` en `dist/github-copilot/`.
+2. Copia el binario compiler hook `ospec-hooks` apropiado para la arquitectura en `scripts/hooks/` (si existe).
+3. Copia todas las carpetas generadas (`agents/`, `prompts/`, `instructions/`, `hooks/`, `skills/`, y `scripts/`) al directorio global de configuración de Copilot CLI:
+   - **Windows**: `C:\Users\<Usuario>\.copilot\`
+   - **Linux/macOS**: `~/.copilot/`
+4. Fusiona dinámicamente las configuraciones de servidores MCP de `.mcp.json` con el archivo `mcp-config.json` global de Copilot.
 
 ### opencode
 
@@ -297,7 +327,8 @@ Empieza por los puntos de entrada visibles y luego inspecciona mas detalle solo 
 | VS Code | El plugin aparece en la vista de Agent Plugins y expone los comandos/chatmodes esperados. |
 | Claude Code temporal | Al lanzar con `claude --plugin-dir dist/claude`, `ospec-workflow` aparece en `/plugin` durante esa sesion. |
 | Claude Code persistente | Al instalar desde `ospec-workflow@ospec-tools`, el plugin aparece en `/plugin` sin usar `--plugin-dir`. |
-| GitHub Copilot CLI / coding agent | El repo destino contiene `.github/`, `.mcp.json` y `scripts/` generados. |
+| GitHub Copilot CLI (Local) | El repo destino contiene `.github/`, `.mcp.json` y `scripts/` generados. |
+| GitHub Copilot CLI (Global) | La carpeta global (`~/.copilot/`) contiene `agents/`, `prompts/`, `instructions/`, `hooks/`, `skills/` y `scripts/` copiados, y `mcp-config.json` tiene la configuración fusionada. |
 | opencode (Local) | El repo destino contiene `.opencode/`, `opencode.json`, `skills/` y `scripts/`. Al presionar Tab o escribir su nombre, el agente `ospec-workflow` aparece en la interfaz. |
 | opencode (Global) | La carpeta global (`~/.config/opencode/`) contiene `agents/`, `commands/`, `instructions/`, `plugins/`, `skills/` y `scripts/`, y `opencode.json` tiene la configuración fusionada. En cualquier repo, al presionar Tab, el agente `ospec-workflow` aparece en la interfaz. |
 
