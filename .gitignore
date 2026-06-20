@@ -27,6 +27,7 @@ Thumbs.db
 *.swp
 
 .atl/
+.antigravitycli/
 
 # ospec-hooks compiled binaries (built by CI, never committed)
 release/dist/ospec-hooks
