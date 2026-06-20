@@ -129,6 +129,53 @@ rules:
     - Warn before merging destructive deltas
 ```
 
+### `capabilities:` Block
+
+The `capabilities:` block in `config.yaml` is a block-sequence list of project technologies and tools.
+- Schema:
+  - `name`: string (required) - name of the capability (e.g., `angular`, `postgres`)
+  - `version`: string (optional) - specific version (e.g., `"17"`)
+  - `source`: string (optional) - defaults to `"declared"`
+- If the block is absent or empty, it is a strict no-op.
+
+Example:
+```yaml
+capabilities:
+  - name: angular
+    version: "17"
+    source: declared
+  - name: postgres
+```
+
+## Registry Cache Skill-Entry Schema
+
+Skill entries cached in `.ospec/cache/skill-registry.cache.json` include their associated capabilities:
+
+```json
+{
+  "id": "stack-angular",
+  "path": "skills/stack-angular/SKILL.md",
+  "triggers": ["angular"],
+  "compact_rules": [
+    "Always prefer standalone components over NgModule-based declarations."
+  ],
+  "capabilities": ["angular"]
+}
+```
+
+## runSessionStart Result Fields
+
+The session-start hook (`runSessionStart`) surfaces configuration parameters to the orchestrator:
+
+| Field | Type | Description |
+|---|---|---|
+| `status` | string | Hook status (`"ok"`, `"error"`) |
+| `ospecDetected` | boolean | `true` if OpenSpec is initialized |
+| `registry` | object | Status of the skill registry cache |
+| `baseline` | object | Baseline status and hint (optional) |
+| `security` | object | Security warnings and alerts (optional) |
+| `capabilities` | string[] | List of active capability names (omitted when empty or absent) |
+
 ## Archive Structure
 
 When archiving, the change folder moves to:

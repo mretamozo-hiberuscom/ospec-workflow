@@ -14,7 +14,7 @@ SessionStart refresh behavior.
 
 ## 1. Catalog Taxonomy
 
-The catalog is organized into three tiers under `skills/`:
+The catalog is organized into four tiers under `skills/`:
 
 ### 1.1 SDD Phase Skills (`skills/sdd-{phase}/SKILL.md`)
 
@@ -65,6 +65,19 @@ directory non-invokable (`disable-model-invocation: true`, `user-invocable: fals
 
 The `_shared/` directory is excluded from registry indexing; its files contribute to
 the fingerprint (see §4.2) but are never emitted as registry skill entries.
+
+### 1.4 Stack Skills (`skills/stack-{name}/SKILL.md`)
+
+Stack skills carry operative, per-technology knowledge — authoring conventions, framework-specific patterns, and project coding rules for a given library or runtime. They are NOT SDD-phase procedure files and MUST NOT carry the `disable-model-invocation: true`, `user-invocable: false`, or `metadata.delegate_only: true` fields.
+
+Each stack skill MUST live at `skills/stack-{name}/SKILL.md` where `{name}` is a lowercase slug matching the technology it covers (e.g., `stack-angular`, `stack-dotnet`, `stack-postgres`).
+
+Identifying traits:
+- No `disable-model-invocation` or `user-invocable` override in frontmatter.
+- License is `Apache-2.0` (matching the utility tier).
+- Frontmatter description must be a meaningful description of the technology domain and key use cases to support judgment-based selection.
+- Frontmatter contains the `capabilities` field.
+- These skills ARE indexed by the registry scanner and injected into sub-agent prompts.
 
 ---
 
@@ -127,6 +140,12 @@ Given/When/Then:
 - **Given** a frontmatter value that is an inline YAML array (`[a, b]`),
   **When** the parser reads it,
   **Then** the value is returned as a JavaScript array of trimmed scalars.
+
+### 2.5 Stack-Skill capabilities Frontmatter Field
+
+Every stack-skill `SKILL.md` SHOULD declare a `capabilities:` frontmatter field whose value is a list of one or more capability name strings. These names MUST match (exactly, case-sensitive) the `name` values used in the `capabilities:` block of `openspec/config.yaml`. When the `capabilities:` field is absent, the skill MUST still be indexed; its registry entry will carry an empty `capabilities` array and the skill will not be selected by capability-based resolution.
+
+The `capabilities:` field MUST NOT be used as a general keyword tag; it MUST list only technology names that correspond to declared project capabilities.
 
 ---
 
@@ -308,9 +327,46 @@ items are excluded because `Purpose` does not match the rules-section pattern.
 
 **Given** a new SKILL.md whose `description` is split across two YAML lines,
 **When** the frontmatter parser reads it,
-**Then** the parser reads only the first line as the value; the second line is treated
-as a continuation raw line and is NOT part of the description attribute, causing
-trigger extraction to fail silently.
+  **Then** the parser reads only the first line as the value; the second line is treated
+  as a continuation raw line and is NOT part of the description attribute, causing
+  trigger extraction to fail silently.
+
+### 7.6 Stack skill passes existing inclusion filter
+
+- GIVEN a file at `skills/stack-angular/SKILL.md` exists in the plugin
+- WHEN `discoverSkills` scans the `skills/` tree
+- THEN `shouldIncludeSkill("skills/stack-angular/SKILL.md")` returns `true`
+- AND `stack-angular` appears as an entry in the `skills` array of the generated cache
+
+### 7.7 Stack skill excluded from SDD-phase tier conventions
+
+- GIVEN a file at `skills/stack-dotnet/SKILL.md` with `license: Apache-2.0`
+  and NO `disable-model-invocation` or `user-invocable` fields
+- WHEN the registry scanner processes it
+- THEN it is indexed as a normal registry entry (same as a utility skill)
+- AND the ORCHESTRATOR GATE blockquote MUST NOT appear in its body
+
+### 7.8 Seed reference skills cover the contract
+
+- GIVEN reference stack skills `skills/stack-angular/`, `skills/stack-dotnet/`,
+  and `skills/stack-postgres/` exist with valid frontmatter and body
+- WHEN `discoverSkills` runs
+- THEN all three appear in the registry `skills` array with non-empty `compact_rules`
+  and `capabilities` arrays
+
+### 7.9 capabilities field present and non-empty
+
+- GIVEN a stack skill with frontmatter `capabilities: [angular]`
+- WHEN the frontmatter parser reads the field
+- THEN the value is available as a parseable list containing `"angular"`
+- AND the registry entry for this skill carries `capabilities: ["angular"]`
+
+### 7.10 capabilities field absent — skill still indexed, empty array in cache
+
+- GIVEN a stack skill `SKILL.md` that has no `capabilities:` field in frontmatter
+- WHEN `discoverSkills` processes it
+- THEN the skill IS included in the registry with `capabilities: []`
+- AND it will NOT be matched by any capability-based resolution
 
 ---
 
@@ -435,3 +491,14 @@ En modo federado, la documentación técnica del coordinador (`docs/architecture
   injection.
 - `skills/skill-creator/references/skill-style-guide.md` — normative style guide for
   creating and refactoring skills.
+- `capability-registry` domain spec — schema and semantics of capability names
+- `skill-registry` domain spec — how `capabilities` is read from frontmatter and stored in the cache entry schema
+- `agents` domain spec — how capabilities gate stack-skill injection into sub-agents
+
+---
+
+## Clarifications
+
+### Session 2026-06-20
+
+- Q: Must a stack skill's `description` frontmatter field be meaningful enough to support orchestrator judgment-based selection without an explicit domain field? → A: Yes. The `description` MUST describe the technology domain and key use cases clearly (e.g., "Angular frontend framework — components, reactive forms, routing, signals") so the orchestrator can semantically match it against task intent. There is no `domain:` field on skill frontmatter; `description` is the sole signal for judgment-based selection.

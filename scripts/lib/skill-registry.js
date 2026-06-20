@@ -95,6 +95,23 @@ function extractTriggers(description, fallback) {
   return triggers.length > 0 ? triggers : [fallback];
 }
 
+function extractCapabilities(raw) {
+  if (typeof raw !== "string") {
+    return [];
+  }
+  let str = raw.trim();
+  if (str.startsWith("[")) {
+    str = str.slice(1);
+  }
+  if (str.endsWith("]")) {
+    str = str.slice(0, -1);
+  }
+  return str
+    .split(/[,;]/)
+    .map((cap) => cap.trim())
+    .filter(Boolean);
+}
+
 function extractCompactRules(skillMarkdown) {
   const { body } = parseFrontmatter(skillMarkdown);
   const lines = body.split(/\r?\n/);
@@ -200,7 +217,13 @@ async function discoverSkills(root) {
   for (const file of fingerprintPaths.filter(({ relativePath }) =>
     shouldIncludeSkill(relativePath),
   )) {
-    const markdown = await fs.readFile(file.absolutePath, "utf8");
+    let markdown = "";
+    try {
+      markdown = await fs.readFile(file.absolutePath, "utf8");
+    } catch (error) {
+      console.error(`Warning: failed to read skill file ${file.absolutePath}: ${error.message}`);
+      continue;
+    }
     const { attributes } = parseFrontmatter(markdown);
     const fallbackName = path.basename(path.dirname(file.absolutePath));
     const id = attributes.name || fallbackName;
@@ -210,6 +233,7 @@ async function discoverSkills(root) {
       path: file.relativePath,
       triggers: extractTriggers(attributes.description || "", id),
       compact_rules: extractCompactRules(markdown),
+      capabilities: extractCapabilities(attributes.capabilities || ""),
     });
   }
 
@@ -253,7 +277,15 @@ async function calculateFingerprint(paths) {
   for (const file of files) {
     hash.update(file.relativePath);
     hash.update("\0");
-    hash.update(await fs.readFile(file.absolutePath));
+    let content = "";
+    try {
+      content = await fs.readFile(file.absolutePath);
+    } catch (error) {
+      if (error.code !== "ENOENT") {
+        throw error;
+      }
+    }
+    hash.update(content);
     hash.update("\0");
   }
 
@@ -276,6 +308,7 @@ async function writeRegistryCache(cachePath, data) {
   await fs.mkdir(path.dirname(cachePath), { recursive: true });
 
   const temporaryPath = `${cachePath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  let writeFailed = false;
 
   try {
     await fs.writeFile(
@@ -284,12 +317,17 @@ async function writeRegistryCache(cachePath, data) {
       "utf8",
     );
     await fs.rename(temporaryPath, cachePath);
+  } catch (error) {
+    writeFailed = true;
+    throw error;
   } finally {
     try {
       await fs.rm(temporaryPath, { force: true });
     } catch (error) {
-      if (error.code !== "ENOENT") {
+      if (!writeFailed && error.code !== "ENOENT") {
         throw error;
+      } else if (error.code !== "ENOENT") {
+        console.error(`Warning: failed to remove temporary cache file ${temporaryPath}: ${error.message}`);
       }
     }
   }
@@ -297,7 +335,9 @@ async function writeRegistryCache(cachePath, data) {
 
 module.exports = {
   calculateFingerprint,
+  collectFiles,
   discoverSkills,
+  extractCapabilities,
   extractCompactRules,
   readRegistryCache,
   writeRegistryCache,

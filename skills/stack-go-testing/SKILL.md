@@ -1,10 +1,11 @@
 ---
-name: go-testing
-description: "Trigger: Go tests, go test coverage, Bubbletea teatest, golden files. Apply focused Go testing patterns."
+name: stack-go-testing
+description: "Go testing standards — unit tests, mocks, integration tests"
 license: Apache-2.0
 metadata:
   author: manuel-retamozo-garcia
   version: "1.0"
+capabilities: [go]
 ---
 
 ## Activation Contract

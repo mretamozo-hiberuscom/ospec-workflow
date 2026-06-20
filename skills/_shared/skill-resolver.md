@@ -34,7 +34,7 @@ Suggested cache shape:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "fingerprint": "sha256:...",
   "generated_at": "ISO-8601",
   "skills": [
@@ -42,7 +42,8 @@ Suggested cache shape:
       "id": "angular",
       "path": "skills/angular/SKILL.md",
       "triggers": ["*.ts", "*.html", "Angular"],
-      "compact_rules": ["..."]
+      "compact_rules": ["..."],
+      "capabilities": ["angular"]
     }
   ]
 }
@@ -82,6 +83,14 @@ What action will the sub-agent perform?
 | Run tests | "test", "vitest", "pytest", "playwright" |
 
 If more than five skill blocks match, keep only the five most relevant. Prioritize code-context matches over task-context matches.
+
+### Stack-Skill Candidate Resolution
+
+When `capabilities:` are active in the project context:
+1. **Name Intersection**: Intersect the active capabilities list (from the session cache) with each skill's `capabilities[]` array (case-sensitive). Sort the resulting candidate set by skill `id` ascending.
+2. **Judgment Filter**: Filter the sorted candidates by comparing their `description` and `capabilities` against the sub-agent's task content, context, and intent. Only include skills that are semantically relevant to the task (no `domain:` field).
+3. **Append to Project Standards**: Format and append the compact rules of the selected stack skills to the `## Project Standards (auto-resolved)` block, respecting the combined utility and stack cap of **5 skill blocks** total.
+4. **Exclusions**: Do NOT inject stack skills into `sdd-archive` or `sdd-init` dispatches.
 
 ## Inject into Sub-Agent Prompt
 

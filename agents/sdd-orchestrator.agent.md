@@ -681,6 +681,25 @@ For each sub-agent launch:
 **Key rule**: inject compact rules TEXT when available, not paths. Phase agents may load exact `SKILL.md` paths only when no compact-rule source exists and those paths were explicitly supplied.
 **Context budget rule**: never inline the full contents of `proposal.md`, `proposal-lite.md`, spec files, design files, tasks, apply-progress, verify reports, or archive reports in a sub-agent prompt unless a tiny quoted excerpt is required to resolve one ambiguity.
 
+### Capability-Aware Stack-Skill Injection
+
+ALL sub-agent launch prompts that involve reading, writing, or reviewing code MUST include pre-resolved **stack-skill** compact rules if active.
+
+1. **Read Active Capabilities**:
+   At session start or first delegation, read `result.capabilities` from the session cache produced by `runSessionStart`. If the key is absent or empty, no capabilities are active; skip all stack-skill injection steps silently.
+
+2. **Resolve Candidate Skills**:
+   Filter the parsed skills from `.ospec/cache/skill-registry.cache.json` (or the orchestrator's resolved session cache) to entries whose `capabilities` array contains any of the active capability names (exact, case-sensitive match). Sort the resulting candidate set by skill `id` ascending (lexicographical order).
+
+3. **Judgment-Based Task-Domain Filtering**:
+   For each candidate skill, perform a semantic judgment match. Compare the candidate's `description` and its `capabilities[]` against the sub-agent's current task content, context, and intent. Include only semantically relevant skills in the injection set. There is no `domain:` field in the schema; selection relies purely on semantic judgment.
+
+4. **Inject and Cap**:
+   - Format and append the compact rules of the selected candidates to the `## Project Standards (auto-resolved)` block in the sub-agent's prompt, placed immediately after the utility-skill rules.
+   - The combined injection limit for utility skills and stack skills is **5 skill blocks** total.
+   - If the active capabilities are absent or the candidate set resolves to empty, perform a no-op.
+   - **Exclusion list**: Do NOT inject stack skills into `sdd-archive` or `sdd-init` dispatches.
+
 ### Communication Skill Routing
 
 Use `caveman-*` skills through the registry only; do not hard-load their full `SKILL.md` files into phase agents.

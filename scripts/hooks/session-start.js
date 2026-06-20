@@ -12,9 +12,14 @@ const {
 } = require("../lib/skill-registry.js");
 const { readBaselineState } = require("../lib/ospec-state.js");
 const {
+  parseCapabilities,
+  capabilityNames,
+} = require("../lib/capability-registry.js");
+const {
   ARTIFACT_STORE_RELATIVE_PATHS,
   createArtifactStoreFromConfig,
 } = require("../lib/artifact-store.js");
+const { resolveWorkspaceCwd } = require("../lib/pathsafe.js");
 
 const CACHE_VERSION = 2;
 const CACHE_RELATIVE_PATH = ARTIFACT_STORE_RELATIVE_PATHS.cache;
@@ -44,12 +49,8 @@ function buildBaselineHint(baselineState) {
 }
 
 function resolveWorkspace(input, fallbackCwd) {
-  const requestedCwd =
-    typeof input.cwd === "string" && input.cwd.trim()
-      ? input.cwd
-      : fallbackCwd;
-
-  return path.resolve(requestedCwd);
+  const inputCwd = input && typeof input === "object" ? input.cwd : undefined;
+  return resolveWorkspaceCwd(inputCwd, fallbackCwd);
 }
 
 async function runSessionStart({
@@ -76,10 +77,13 @@ async function runSessionStart({
   }
 
   let baselineHint = null;
+  let activeCapabilities = [];
   try {
     const configContent = await store.readConfig();
     if (configContent !== null) {
       baselineHint = buildBaselineHint(readBaselineState(configContent));
+      const parsedCaps = parseCapabilities(configContent);
+      activeCapabilities = capabilityNames(parsedCaps);
     }
   } catch {
     // Baseline state read failure must not break session start
@@ -121,50 +125,28 @@ async function runSessionStart({
     result.baseline = { hint: baselineHint };
   }
 
+  if (activeCapabilities.length > 0) {
+    result.capabilities = activeCapabilities;
+  }
+
   if (process.env.DISABLE_AGENT_SHIELD !== "true") {
     const alerts = [];
-    
-    // Check .env and .npmrc files in workspace root
-    const envFiles = [".env", ".env.local", ".env.development", ".env.production", ".npmrc"];
     let gitignoreContent = "";
     try {
       gitignoreContent = fs.readFileSync(path.join(workspace, ".gitignore"), "utf8");
-    } catch (e) {}
+    } catch (e) {
+      if (e.code !== "ENOENT") {
+        console.error(`Warning: failed to read .gitignore: ${e.message}`);
+      }
+    }
 
     const gitignoreLines = gitignoreContent
       .split(/\r?\n/)
       .map(line => line.trim())
       .filter(line => line && !line.startsWith("#"));
 
-    for (const f of envFiles) {
-      if (fs.existsSync(path.join(workspace, f))) {
-        // Check if f is listed in .gitignore
-        const ignored = gitignoreLines.some(line => line === f || line.includes(f));
-        if (!ignored) {
-          alerts.push({
-            type: "unignored-env-file",
-            file: f,
-            reason: "El archivo sensible no está ignorado en Git"
-          });
-        }
-      }
-    }
-
-    // Check .git/config in workspace root
-    const gitConfigPath = path.join(workspace, ".git", "config");
-    if (fs.existsSync(gitConfigPath)) {
-      try {
-        const gitConfigContent = fs.readFileSync(gitConfigPath, "utf8");
-        // Regex to check for embedded credentials in https URLs
-        if (/https?:\/\/[^/:\s]+:[^/:\s]+@/.test(gitConfigContent)) {
-          alerts.push({
-            type: "embedded-credentials",
-            file: ".git/config",
-            reason: "El archivo contiene credenciales en texto plano"
-          });
-        }
-      } catch (e) {}
-    }
+    checkUnignoredEnvFiles(workspace, gitignoreLines, alerts);
+    checkEmbeddedCredentials(workspace, alerts);
 
     if (alerts.length > 0) {
       result.security = {
@@ -178,6 +160,42 @@ async function runSessionStart({
   }
 
   return result;
+}
+
+function checkUnignoredEnvFiles(workspace, gitignoreLines, alerts) {
+  const envFiles = [".env", ".env.local", ".env.development", ".env.production", ".npmrc"];
+  for (const f of envFiles) {
+    if (fs.existsSync(path.join(workspace, f))) {
+      const ignored = gitignoreLines.some(line => line === f || line.includes(f));
+      if (!ignored) {
+        alerts.push({
+          type: "unignored-env-file",
+          file: f,
+          reason: "El archivo sensible no está ignorado en Git"
+        });
+      }
+    }
+  }
+}
+
+function checkEmbeddedCredentials(workspace, alerts) {
+  const gitConfigPath = path.join(workspace, ".git", "config");
+  if (fs.existsSync(gitConfigPath)) {
+    try {
+      const gitConfigContent = fs.readFileSync(gitConfigPath, "utf8");
+      if (/https?:\/\/[^/:\s]+:[^/:\s]+@/.test(gitConfigContent)) {
+        alerts.push({
+          type: "embedded-credentials",
+          file: ".git/config",
+          reason: "El archivo contiene credenciales en texto plano"
+        });
+      }
+    } catch (e) {
+      if (e.code !== "ENOENT") {
+        console.error(`Warning: failed to read .git/config: ${e.message}`);
+      }
+    }
+  }
 }
 
 async function readJsonInput(stream = process.stdin) {

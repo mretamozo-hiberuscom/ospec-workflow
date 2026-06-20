@@ -104,6 +104,7 @@ test("creates the registry cache when OpenSpec is detected", async (t) => {
         "Keep output deterministic.",
         "Do not mutate OpenSpec.",
       ],
+      capabilities: [],
     },
   ]);
 });
@@ -419,4 +420,167 @@ test("agent-shield: scans for embedded credentials in .git/config in SessionStar
   assert.equal(alert.type, "embedded-credentials");
   assert.match(result.systemMessage, /credenciales/i);
 });
+
+// ---------------------------------------------------------------------------
+// Capabilities surfacing (Tasks 1.8, 1.9, 1.10)
+// ---------------------------------------------------------------------------
+
+test("capabilities surfaced in result when config has block-sequence capabilities", async (t) => {
+  const configContent = [
+    "strict_tdd: true",
+    "capabilities:",
+    "  - name: angular",
+    "  - name: postgres",
+    "",
+  ].join("\n");
+
+  const { pluginRoot, workspace } = await createFixture(t, { configContent });
+
+  const result = await runSessionStart({
+    input: { cwd: workspace },
+    pluginRoot,
+    now: () => new Date("2026-06-20T08:00:00.000Z"),
+  });
+
+  assert.deepEqual(result.capabilities, ["angular", "postgres"]);
+});
+
+test("capabilities key absent from result when config has no capabilities block", async (t) => {
+  const { pluginRoot, workspace } = await createFixture(t);
+
+  const result = await runSessionStart({
+    input: { cwd: workspace },
+    pluginRoot,
+    now: () => new Date("2026-06-20T08:00:00.000Z"),
+  });
+
+  assert.equal(result.capabilities, undefined);
+});
+
+test("adding stack skills triggers cache regeneration with capabilities populated", async (t) => {
+  const { pluginRoot, workspace } = await createFixture(t);
+
+  // First run — cache generated without stack skills
+  await runSessionStart({
+    input: { cwd: workspace },
+    pluginRoot,
+    now: () => new Date("2026-06-20T08:00:00.000Z"),
+  });
+
+  // Add stack skills AFTER first run
+  const skillsToCreate = [
+    {
+      id: "stack-angular",
+      capabilities: ["angular"],
+      content: [
+        "---",
+        "name: stack-angular",
+        'description: "Angular frontend. Trigger: angular"',
+        "capabilities: [angular]",
+        "---",
+        "## Critical Rules",
+        "- Use standalone components.",
+      ].join("\n"),
+    },
+    {
+      id: "stack-java",
+      capabilities: ["java"],
+      content: [
+        "---",
+        "name: stack-java",
+        "capabilities: [java]",
+        "---",
+        "## Critical Rules",
+        "- Use constructor injection.",
+      ].join("\n"),
+    },
+    {
+      id: "stack-kafka",
+      capabilities: ["kafka"],
+      content: [
+        "---",
+        "name: stack-kafka",
+        "capabilities: [kafka]",
+        "---",
+        "## Critical Rules",
+        "- Enable idempotence.",
+      ].join("\n"),
+    },
+    {
+      id: "stack-sqlserver",
+      capabilities: ["sqlserver"],
+      content: [
+        "---",
+        "name: stack-sqlserver",
+        "capabilities: [sqlserver]",
+        "---",
+        "## Critical Rules",
+        "- Enable RCSI.",
+      ].join("\n"),
+    },
+  ];
+
+  for (const skill of skillsToCreate) {
+    const dir = path.join(pluginRoot, "skills", skill.id);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, "SKILL.md"), skill.content);
+  }
+
+  // Second run — fingerprint changed, should regenerate
+  const result = await runSessionStart({
+    input: { cwd: workspace },
+    pluginRoot,
+    now: () => new Date("2026-06-20T09:00:00.000Z"),
+  });
+
+  assert.equal(result.registry.status, "generated");
+
+  const cache = JSON.parse(
+    await fs.readFile(
+      path.join(workspace, ...CACHE_RELATIVE_PATH.split("/")),
+      "utf8",
+    ),
+  );
+
+  for (const skill of skillsToCreate) {
+    const stackEntry = cache.skills.find((s) => s.id === skill.id);
+    assert.ok(stackEntry, `${skill.id} must appear in cache after regen`);
+    assert.deepEqual(stackEntry.capabilities, skill.capabilities);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Robustness and input fallback tests
+// ---------------------------------------------------------------------------
+
+test("runSessionStart: input is null handles fallbackCwd resolving correctly", async (t) => {
+  const { pluginRoot, workspace } = await createFixture(t);
+  const result = await runSessionStart({
+    input: null,
+    pluginRoot,
+    fallbackCwd: workspace,
+    now: () => new Date("2026-06-20T08:00:00.000Z"),
+  });
+  assert.equal(result.status, "ok");
+  assert.equal(result.ospecDetected, true);
+});
+
+test("runSessionStart: config read failure (EISDIR/EPERM) does not break session start", async (t) => {
+  const { pluginRoot, workspace } = await createFixture(t, { withOpenSpec: false });
+  // Create openspec/config.yaml as a directory to trigger read error
+  const configPath = path.join(workspace, "openspec", "config.yaml");
+  await fs.mkdir(configPath, { recursive: true });
+
+  const result = await runSessionStart({
+    input: { cwd: workspace },
+    pluginRoot,
+    now: () => new Date("2026-06-20T08:00:00.000Z"),
+  });
+
+  assert.equal(result.status, "ok");
+  assert.equal(result.ospecDetected, true);
+  assert.equal(result.baseline, undefined);
+  assert.equal(result.capabilities, undefined);
+});
+
 

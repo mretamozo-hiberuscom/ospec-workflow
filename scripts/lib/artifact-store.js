@@ -323,9 +323,14 @@ async function createArtifactStoreFromConfig({
     return createArtifactStore({ mode, workspace: resolvedWorkspace, execGitSync });
   }
 
-  const config = await createArtifactStore({
-    workspace: resolvedWorkspace,
-  }).readConfig();
+  let config = null;
+  try {
+    config = await createArtifactStore({
+      workspace: resolvedWorkspace,
+    }).readConfig();
+  } catch (error) {
+    // If reading configuration fails, fallback to null config (which defaults to DEFAULT_ARTIFACT_STORE_MODE)
+  }
   const resolvedMode = config
     ? ospec.readBackendMode(config)
     : DEFAULT_ARTIFACT_STORE_MODE;
