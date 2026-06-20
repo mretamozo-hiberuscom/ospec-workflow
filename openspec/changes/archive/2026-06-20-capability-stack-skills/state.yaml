@@ -1,0 +1,96 @@
+schema: sdd-change-state
+change: capability-stack-skills
+
+classification: normal
+
+session:
+  artifact_store: openspec
+  delivery_strategy: single-pr
+
+status: archived
+last_updated: 2026-06-20T10:35:45Z
+
+blocking_questions: []
+
+phases:
+  proposal:
+    status: done
+    artifact: openspec/changes/capability-stack-skills/proposal.md
+  spec:
+    status: done
+    artifacts:
+      - openspec/changes/capability-stack-skills/specs/capability-registry/spec.md
+      - openspec/changes/capability-stack-skills/specs/skills/spec.md
+      - openspec/changes/capability-stack-skills/specs/skill-registry/spec.md
+      - openspec/changes/capability-stack-skills/specs/agents/spec.md
+  clarify:
+    status: done
+    questions_asked: 1
+    artifacts:
+      - openspec/changes/capability-stack-skills/specs/capability-registry/spec.md
+      - openspec/changes/capability-stack-skills/specs/skills/spec.md
+      - openspec/changes/capability-stack-skills/specs/agents/spec.md
+  design:
+    status: done
+    artifact: openspec/changes/capability-stack-skills/design.md
+  tasks:
+    status: done
+    artifact: openspec/changes/capability-stack-skills/tasks.md
+  apply:
+    status: done
+    artifact: openspec/changes/capability-stack-skills/apply-progress.md
+  verify:
+    status: done
+    artifact: openspec/changes/capability-stack-skills/verify-report.md
+  archive:
+    status: done
+    artifact: openspec/changes/capability-stack-skills/archive-report.md
+
+gates:
+  review-workload:
+    estimated_changed_lines: "~1 000–1 100 additions (minimal deletions)"
+    budget_risk: High
+    chained_prs_recommended: true
+    chain_strategy: pending
+    decision_needed_before_apply: true
+    suggested_split: >
+      PR 1: capability-registry.js + .test.js + skill-registry.js/test delta +
+      session-start.js/test delta + 3 seed SKILL.md files (~580 lines).
+      PR 2: orchestrator MD + skill-resolver.md + openspec-convention.md +
+      config.yaml example + 4 dist regenerations (~490 lines, generated dominates).
+    recommendation: >
+      Delivery strategy is single-pr. Recommend size:exception approval before
+      sdd-apply starts. Generated dist artifacts are the largest contributor and
+      are a natural size:exception candidate. If chaining is preferred, use
+      stacked-to-main: PR 1 (logic + tests + seeds) merges first; PR 2 (docs +
+      dist) depends on PR 1.
+
+open_decisions:
+  - id: AMBIGUITY-A1
+    summary: "Detection shape — what writes source:detected entries, what heuristics, which component"
+    phase: clarify
+    status: resolved
+    resolution: >
+      source:detected is a forward-compatible schema field only in this change.
+      No detection-writing component is implemented. declared = authoritative
+      (tooling must not auto-remove); detected = advisory (may be auto-refreshed
+      by a future change). Both values resolve stack skills identically.
+  - id: AMBIGUITY-A2
+    summary: "Task-domain inference — how orchestrator determines frontend vs backend domain for stack-skill filtering"
+    phase: clarify
+    status: resolved
+    resolution: >
+      Orchestrator judgment / semantic selection, faithful to ECC. The orchestrator
+      reads each candidate skill's description and capabilities frontmatter and weighs
+      them against the task content and intent. No domain: field on task entries or
+      skill frontmatter. Stack skills must carry a meaningful description field.
+      5-skill combined cap (utility + stack) remains the hard guard.
+  - id: AMBIGUITY-A3
+    summary: "Multi-skill resolution precedence — priority order when a capability maps to multiple stack skills; tie-breaking under five-skill cap"
+    phase: clarify
+    status: resolved
+    resolution: >
+      Design-deferrable. Default tie-breaking order is deterministic registry/alphabetical
+      order by skill id. With the 2-3 seed skills in v1 (one per technology) this case
+      never occurs. A future change adding multiple skills per capability must specify
+      an explicit precedence rule.

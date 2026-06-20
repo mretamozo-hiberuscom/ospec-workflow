@@ -11,7 +11,7 @@ context: |
 
 project:
   name: ospec-workflow
-  version: 2.4.5
+  version: 2.4.7
   status: active
 
 artifact_store:
@@ -168,4 +168,19 @@ routing:
 #     - type: load-rules
 #       rules: "Coverage must be >= 80% before sign-off."
 #       on_failure: advisory
+# ---------------------------------------------------------------------------
+#
+# ---------------------------------------------------------------------------
+# capabilities: (OPTIONAL — all lines below are commented out; uncomment to activate)
+#
+# Declared list of project technologies and tools used for stack-skill selection.
+# The absent block is a strict no-op: no capability-aware stack skills will be injected.
+#
+# capabilities:
+#   - name: angular
+#     version: "17"
+#     source: declared
+#   - name: postgres
+#     version: "16"
+#     source: declared
 # ---------------------------------------------------------------------------
