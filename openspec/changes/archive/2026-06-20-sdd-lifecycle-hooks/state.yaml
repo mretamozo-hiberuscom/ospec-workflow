@@ -1,0 +1,98 @@
+schema: sdd-change-state
+change: sdd-lifecycle-hooks
+
+classification: normal
+
+session:
+  artifact_store: openspec
+  delivery_strategy: single-pr
+
+status: archived
+last_updated: 2026-06-20T23:45:00Z
+
+route:
+  intended_route: standard
+  actual_route: standard
+  route_rationale: "classification=normal; project.status=active -> standard (first match after foundation/federated/debug/brownfield conditions all unmatched)"
+  validated: true
+  validation_errors: []
+
+blocking_questions: []
+
+gates:
+  clarify:
+    status: done
+    questions_asked: 0
+  review-workload:
+    status: done
+    forecast: "~1000-1100 lines; 400-budget risk High; chained PRs recommended"
+    decision: size-exception
+    surfaced_to_user: true
+  4r-review-gate:
+    status: done
+    on_blocker: advisory
+    findings_summary: "0 BLOCKER, 1 CRITICAL, 10 WARNING, 5 SUGGESTION"
+    surfaced_to_user: true
+    remediation:
+      status: resolved
+      passes: 3
+      resolved_at: 2026-06-20T23:30:00Z
+      verified_by: review-reliability + review-risk re-review
+      test_evidence: "npm test 557/557 pass"
+      notes: >
+        Pass #1 fixed reliability-C1 (null/primitive element) + 3 security WARNINGs
+        (load-skill path confinement, load-rules length cap, run-command/PreToolUse
+        trust boundary docs). Pass #2 fixed a regression path-confinement introduced
+        (non-string skill threw via _isConfinedSkillPath) + non-string rules silent
+        bypass + orchestrator hardening (UNTRUSTED label, mandatory pre-read
+        validation, symlink-escape guard, credential-hygiene). Pass #3 closed the
+        residual entry-guard WARNING (validateHooksBlock(null/undefined)). Never-throw
+        contract now total.
+    critical:
+      - id: reliability-C1
+        finding: "validateHooksBlock throws TypeError on a null action-array element (YAML '- ~' / empty list item) instead of returning {valid:false}"
+        origin: code-bug
+        file: scripts/lib/lifecycle-hooks.js
+        status: resolved
+
+approvals:
+  - id: review-workload-001
+    gate: review-workload
+    decision: size:exception
+    source: vscode/askQuestions
+    accepted_at: 2026-06-20T18:45:00Z
+    applies_to:
+      - sdd-apply
+
+phases:
+  proposal:
+    status: done
+    artifact: openspec/changes/archive/2026-06-20-sdd-lifecycle-hooks/proposal.md
+  spec:
+    status: done
+    artifacts:
+      - openspec/changes/archive/2026-06-20-sdd-lifecycle-hooks/specs/lifecycle-hooks/spec.md
+      - openspec/changes/archive/2026-06-20-sdd-lifecycle-hooks/specs/routing/spec.md
+      - openspec/changes/archive/2026-06-20-sdd-lifecycle-hooks/specs/agents/spec.md
+  clarify:
+    status: done
+    questions_asked: 0
+    artifact: ~
+  design:
+    status: done
+    artifact: openspec/changes/archive/2026-06-20-sdd-lifecycle-hooks/design.md
+  tasks:
+    status: done
+    artifact: openspec/changes/archive/2026-06-20-sdd-lifecycle-hooks/tasks.md
+  apply:
+    status: done
+    artifact: openspec/changes/archive/2026-06-20-sdd-lifecycle-hooks/apply-progress.md
+  verify:
+    status: done
+    artifact: openspec/changes/archive/2026-06-20-sdd-lifecycle-hooks/verify-report.md
+    verdict: pass-with-warnings
+  archive:
+    status: done
+    artifact: openspec/changes/archive/2026-06-20-sdd-lifecycle-hooks/archive-report.md
+
+open_decisions: []

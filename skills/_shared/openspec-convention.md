@@ -196,3 +196,94 @@ Gate-specific fields (optional, vary by gate):
 | `4r-review-gate` | `on_blocker` | Policy applied to BLOCKER findings (`advisory` default) |
 | `4r-review-gate` | `findings_summary` | Human-readable count of findings by severity |
 | `4r-review-gate` | `surfaced_to_user` | `true` when BLOCKER/CRITICAL findings were shown via `vscode/askQuestions` |
+
+### `lifecycle_hooks:` block
+
+Written **incrementally** by the orchestrator into `state.yaml` immediately after each lifecycle event's actions complete (see `agents/sdd-orchestrator.agent.md §Lifecycle Hook Dispatch`).  This block is a sibling of `gates:` at the same YAML indentation level.
+
+```yaml
+lifecycle_hooks:
+  before-change:
+    status: done               # done | failed | skipped
+    actions:
+      - type: load-skill
+        skill: skills/sec/SKILL.md
+        outcome: success       # success | failed | skipped
+        policy: advisory       # advisory | halt  (mapped from on_failure)
+  before-task:                 # repeated event → indexed occurrences[]
+    status: done               # worst status across all occurrences
+    occurrences:
+      - index: 0               # 0-based invocation index
+        batch: 1               # sdd-apply batch number
+        status: done
+        actions:
+          - type: run-command
+            command: npm run lint
+            outcome: success
+            policy: advisory
+  before-verify:
+    status: failed
+    actions:
+      - type: run-command
+        command: npm run preflight
+        outcome: failed
+        policy: halt
+        message: "exit code 1" # present only on failed actions
+```
+
+`lifecycle_hooks:` field reference:
+
+| Field | Location | Type | Values / Description |
+|-------|----------|------|----------------------|
+| `status` | event or occurrence level | string | `done` — all actions succeeded (advisory failures OK); `failed` — a `halt` action failed; `skipped` — event does not apply to this route, or all actions were skipped |
+| `actions[].type` | action | string | `load-skill` \| `load-rules` \| `run-command` |
+| `actions[].outcome` | action | string | `success` \| `failed` \| `skipped` |
+| `actions[].policy` | action | string | `advisory` \| `halt` (maps from `on_failure`; default `advisory`) |
+| `actions[].message` | action (optional) | string | Present only on failed actions; contains error detail |
+| `actions[].skill` | `load-skill` | string | Path to the skill file (relative to repo root) |
+| `actions[].rules` | `load-rules` | string | Verbatim rules text |
+| `actions[].command` | `run-command` | string | Command string that was issued |
+| `occurrences[].index` | `before-task` | number | 0-based firing index across all apply batches |
+| `occurrences[].batch` | `before-task` | number | `sdd-apply` invocation batch number |
+
+**Write rules**:
+- Write immediately after each event completes (do NOT defer to route end).
+- For `before-task`, read the existing entry from `state.yaml` and pass it as `opts.existing` to `buildAuditEntry` to append; never overwrite prior occurrences.
+- When `eventAppliesToRoute(event, routePhases)` returns `false`, write `{status: skipped, actions: []}` at route start.
+- Use field names exactly as shown; do NOT include `on_failure` in the audit shape (`on_failure` is a config-only field; the audit uses `policy`).
+
+## `hooks:` Block in `openspec/config.yaml`
+
+The optional `hooks:` key in `openspec/config.yaml` declares lifecycle actions that the orchestrator fires at SDD phase boundaries.  Absence of this key is a no-op; route execution is identical to the pre-hooks baseline.
+
+```yaml
+hooks:                              # OPTIONAL top-level map; absent = no-op
+  before-change:                    # event key ∈ taxonomy; unknown keys are silently ignored
+    - type: load-skill              # load-skill | load-rules | run-command
+      skill: skills/sec/SKILL.md    # REQUIRED for load-skill (path from repo root)
+      on_failure: advisory          # advisory (default) | halt
+  before-implementation:
+    - type: run-command
+      command: npm run preflight    # REQUIRED for run-command
+      on_failure: halt
+  before-verify:
+    - type: load-rules
+      rules: "Coverage must be >= 80% before sign-off."  # REQUIRED for load-rules
+      on_failure: advisory
+```
+
+`hooks:` schema reference:
+
+| Key | Level | Type | Required | Description |
+|-----|-------|------|----------|-------------|
+| `hooks` | top-level | object | No | Map of event keys → action arrays. Absent = no-op. |
+| `hooks.{event}` | event | array | No | List of actions to fire at this boundary. Unknown event keys are silently ignored. |
+| `hooks.{event}[].type` | action | string | Yes | `load-skill` \| `load-rules` \| `run-command` |
+| `hooks.{event}[].skill` | action | string | For `load-skill` | Path to a skill file, relative to repo root. |
+| `hooks.{event}[].rules` | action | string | For `load-rules` | Verbatim rules text injected into the sub-agent prompt. |
+| `hooks.{event}[].command` | action | string | For `run-command` | Shell command string issued via the orchestrator's execute tool. |
+| `hooks.{event}[].on_failure` | action | string | No | `advisory` (default) or `halt`. `advisory` — log and continue; `halt` — surface a Retry/Override/Abort gate before crossing the boundary. |
+
+**Valid event keys** (7 total): `before-change`, `before-implementation`, `before-task`, `before-commit`, `before-verify`, `after-verify`, `after-archive`.
+
+Use `validateHooksBlock(parseHooksBlock(hooksValue))` from `scripts/lib/lifecycle-hooks.js` for advisory validation.

@@ -135,3 +135,37 @@ routing:
     gates: []
     description: "Reduced SDD for trivial/small changes."
     cost: low
+
+# ---------------------------------------------------------------------------
+# hooks: (OPTIONAL — all lines below are commented out; uncomment to activate)
+#
+# Declarative lifecycle hooks fired by the orchestrator at SDD phase boundaries.
+# Absence of this block is a strict no-op: route execution is identical to the
+# pre-hooks baseline.
+#
+# Recognised event keys (7 total, in typical firing order):
+#   before-change         — before the first phase of any route
+#   before-implementation — before sdd-apply is dispatched
+#   before-task           — once per sdd-apply invocation (batch)
+#   before-commit         — after the last sdd-apply batch, before sdd-verify
+#   before-verify         — before sdd-verify is dispatched
+#   after-verify          — after sdd-verify completes
+#   after-archive         — after sdd-archive completes
+#
+# Action types: load-skill | load-rules | run-command
+# on_failure:   advisory (default, continue) | halt (block + ask user)
+#
+# hooks:
+#   before-change:
+#     - type: load-skill
+#       skill: skills/sec/SKILL.md   # path relative to repo root
+#       on_failure: advisory
+#   before-implementation:
+#     - type: run-command
+#       command: npm run preflight   # issued via orchestrator's execute tool
+#       on_failure: halt             # halt → Retry/Override/Abort gate
+#   before-verify:
+#     - type: load-rules
+#       rules: "Coverage must be >= 80% before sign-off."
+#       on_failure: advisory
+# ---------------------------------------------------------------------------
