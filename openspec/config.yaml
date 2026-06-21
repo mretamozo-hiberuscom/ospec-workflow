@@ -11,7 +11,7 @@ context: |
 
 project:
   name: ospec-workflow
-  version: 2.4.9
+  version: 2.5.0
   status: active
 
 artifact_store:
@@ -136,6 +136,81 @@ routing:
     description: "Reduced SDD for trivial/small changes."
     cost: low
 
+# ---------------------------------------------------------------------------
+# quality_gates: (OPTIONAL — all lines below are commented out; uncomment to activate)
+#
+# Declarative quality gate policy evaluated by sdd-verify after test/build steps.
+# Absence of this block is a strict no-op: verify behavior is identical to the
+# pre-quality-gates baseline (legacy `rules.verify.coverage_threshold` stays active).
+#
+# When this block IS declared, `quality_gates.tests.coverage.minimum` supersedes
+# `rules.verify.coverage_threshold` for the tests gate coverage check.
+#
+# Recognised gate slots (4 total):
+#   tests        — runs the test suite; optional coverage sub-check
+#   lint         — static analysis / linting
+#   architecture — structural / dependency rules
+#   security     — vulnerability scan
+#
+# Unknown gate keys at the `quality_gates:` level are silently ignored
+# (forward-compatibility with future gate slots).
+#
+# Per-gate fields:
+#   required    boolean  default false   — whether gate failure affects verify outcome
+#   on_fail     advisory | halt  default advisory
+#               advisory → records WARNING finding; archive not blocked
+#               halt     → records BLOCKER finding; archive blocked until fixed or overridden
+#               NOTE: on_fail defaults to 'advisory' for ALL gates regardless of required.
+#               To get blocking behavior, you MUST declare on_fail: halt explicitly.
+#   command     string  absent → gate skipped-with-warning (NOT a failure)
+#   timeout_ms  integer > 0  default 120000 — per-gate execution budget; on
+#               timeout the gate is recorded as `error` (not a quality fail).
+#               Non-positive/non-integer values fall back to the default.
+#
+# tests gate extra fields:
+#   coverage.minimum  number 0-100   absent/invalid → coverage check disabled
+#                                    (an invalid value surfaces a validation warning)
+#   coverage.command  string         stdout MUST be the coverage % (0-100)
+#                                    absent → coverage check skipped-with-warning (not fail)
+#                                    out-of-range stdout → skipped-with-warning (NOT clamped)
+#
+# Gate status values: pass | fail | skipped | error
+#   error = the command could not run (ENOENT, permission denied, timeout, or a
+#   non-numeric exit code). A required+halt gate that errors blocks archive, same
+#   as a fail, but is recorded distinctly in the audit so a tool failure is never
+#   silently reported as a quality fail.
+#
+# SECURITY — gate command trust boundary (mirrors lifecycle hooks `run-command`):
+#   `command` and `coverage.command` are executed with FULL privilege by
+#   sdd-verify and flow through the existing PreToolUse DENY/ASK evaluation
+#   unchanged. They live in committable config (this file) and the verify-report.
+#   Treat them as trusted, version-controlled configuration: DO NOT embed secrets,
+#   tokens, or credentials inline. Use environment variables or secret-manager
+#   references resolved at runtime, and scrutinize gate commands in PR review.
+#
+# quality_gates:
+#   tests:
+#     required: false            # boolean; default false
+#     on_fail: advisory          # advisory (default) | halt
+#     command: "npm test"        # absent/empty => gate skipped-with-warning
+#     timeout_ms: 120000         # optional; positive integer; default 120000
+#     coverage:
+#       minimum: 80              # number 0-100; absent/invalid => no coverage check
+#       command: "npm run coverage:pct"  # stdout is the %; absent => coverage skipped+warn
+#   lint:
+#     required: true
+#     on_fail: halt
+#     command: "npm run lint"
+#   architecture:
+#     required: false
+#     on_fail: advisory
+#     command: "npm run arch:check"
+#   security:
+#     required: false
+#     on_fail: advisory
+#     command: "npm run audit"
+# ---------------------------------------------------------------------------
+#
 # ---------------------------------------------------------------------------
 # hooks: (OPTIONAL — all lines below are commented out; uncomment to activate)
 #

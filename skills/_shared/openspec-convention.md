@@ -244,6 +244,76 @@ Gate-specific fields (optional, vary by gate):
 | `4r-review-gate` | `findings_summary` | Human-readable count of findings by severity |
 | `4r-review-gate` | `surfaced_to_user` | `true` when BLOCKER/CRITICAL findings were shown via `vscode/askQuestions` |
 
+### `gates.quality-gates:` block
+
+Written by `sdd-verify` (Step 9a) **only when `quality_gates:` is declared** in
+`openspec/config.yaml`. This block is a sibling of `gates.clarify` and
+`gates.4r-review-gate` at the same YAML indentation level.
+
+When `quality_gates:` is absent, this block MUST NOT be written to `state.yaml`.
+
+**Naming asymmetry (intentional)**: the **config** key is snake_case
+`quality_gates:` (YAML config convention, alongside `rules:`, `hooks:`), while
+the **state** gate name is kebab-case `gates.quality-gates` (matches the sibling
+state gate names `clarify`, `4r-review-gate`). This is deliberate, not a typo.
+
+```yaml
+gates:
+  quality-gates:
+    status: pass | fail | skipped         # 'fail' also covers a required-halt 'error'
+    evaluated_at: <ISO 8601 UTC timestamp>
+    override:                              # present ONLY when user forced archive with justification
+      timestamp: <ISO 8601 UTC timestamp>
+      justification: "<verbatim user text>"
+    gates:
+      tests:
+        status: pass | fail | skipped | error
+        required: true
+        on_fail: halt
+        detail: "coverage 72% < minimum 80%"   # present only when informative
+      lint:
+        status: error                          # command could not run / timed out
+        required: true
+        on_fail: halt
+        detail: "command timed out after 120000ms"
+      architecture:
+        status: skipped
+        required: false
+        on_fail: advisory
+        detail: "command not configured"
+      security:
+        status: pass
+        required: false
+        on_fail: advisory
+```
+
+`gates.quality-gates` field reference:
+
+| Field | Level | Type | Description |
+|-------|-------|------|-------------|
+| `status` | top-level | `pass \| fail \| skipped` | Aggregate status: `fail` if any halt-required gate `fail`/`error`; `skipped` if all gates skipped; `pass` otherwise |
+| `evaluated_at` | top-level | string | ISO 8601 UTC timestamp when evaluation completed |
+| `override` | top-level (optional) | object | Present only when the user forced archive past a failed halt gate |
+| `override.timestamp` | override | string | ISO 8601 UTC timestamp of the override decision |
+| `override.justification` | override | string | Verbatim user-provided justification text |
+| `gates.{name}.status` | per-gate | `pass \| fail \| skipped \| error` | Gate-level evaluation result. `error` = command could not run / timed out / non-numeric exit code — distinct from a quality `fail` |
+| `gates.{name}.required` | per-gate | boolean | Value from parsed policy |
+| `gates.{name}.on_fail` | per-gate | `advisory \| halt` | Value from parsed policy |
+| `gates.{name}.detail` | per-gate (optional) | string | Present only when informative (e.g., coverage below threshold, command not configured, command timed out) |
+
+Top-level `status` aggregation rules (checked in order):
+
+| Condition | Top-level status |
+|-----------|-----------------|
+| Any gate with `required: true, on_fail: halt` has status `fail` OR `error` | `fail` |
+| All gates skipped (no commands configured) | `skipped` |
+| Otherwise (at least one `pass`; or a mix of `pass`/`skipped` with no halt fail/error) | `pass` |
+
+The `override` sub-block is added by the **orchestrator** (never by `sdd-verify`)
+when the user forces archive dispatch past a failed halt gate. The orchestrator
+MUST also append an `## Override` section to `verify-report.md` with the same
+timestamp and justification before dispatching `sdd-archive`.
+
 ### `lifecycle_hooks:` block
 
 Written **incrementally** by the orchestrator into `state.yaml` immediately after each lifecycle event's actions complete (see `agents/sdd-orchestrator.agent.md §Lifecycle Hook Dispatch`).  This block is a sibling of `gates:` at the same YAML indentation level.

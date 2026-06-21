@@ -74,6 +74,38 @@ Compliance rule matrix:
 8. Assign the strongest evidence level per scenario, then build the behavioral compliance matrix.
 9. Tag each CRITICAL/WARNING issue with a likely origin: `code-bug`, `tasks-gap`, `design-gap`, or `spec-gap`.
 
+### Step 9a: Quality Gates Evaluation
+
+This step runs **after** test/build verification (Step 7) and **before** the operative-memory write (Step 10b). It is a no-op when `quality_gates:` is absent.
+
+**Migration note**: when `quality_gates:` is declared, use `quality_gates.tests.coverage.minimum` as the coverage floor and ignore `rules.verify.coverage_threshold` for the tests gate.
+
+1. Read `quality_gates:` from `openspec/config.yaml`.
+2. Call `parseQualityGates(rawPolicy)` from `scripts/lib/quality-gates.js`.
+   - If the result is `null` (policy absent), skip the entire step — no audit is written, baseline verify behavior is unchanged.
+   - Call `validateQualityGates(policy)`. If it returns errors, surface every error in the `## Quality Gates` report section (H6 — a disabled coverage check or an invalid `timeout_ms` is never silent). Validation is advisory; it never halts the step.
+3. For each gate in the normalized policy:
+   a. Execute its `command` via the agent's `execute` tool with a **bounded timeout** of `cfg.timeout_ms` (H5). If the command exceeds the budget, abort the process and record `execResult.timedOut = true`. If the command cannot start (ENOENT, permission denied), record `execResult.error`. Otherwise capture `execResult.exitCode`.
+   b. For the `tests` gate only, if `coverage.command` is set, execute it (same bounded-timeout rule) and capture its stdout as `execResult.coverageStdout`.
+   c. Call `classifyGate(name, cfg, execResult)` to get `{ status, detail? }`. `status` is one of `pass | fail | skipped | error`; a timed-out or unrunnable command is `error` (H4), distinct from a quality `fail`.
+4. Call `enforceGate(name, cfg, result)` for **ALL** gates before applying any enforcement (fail-fast within the gate loop is prohibited). A required-halt gate whose status is `fail` OR `error` produces a BLOCKER. Collect all findings.
+5. Call `aggregateStatus(gateResults)` to determine the top-level gate status.
+6. Call `buildAuditBlock(gateResults, new Date().toISOString())` to produce the audit block. The top-level `status` is ALWAYS explicit (H1) — a declared policy never yields an absent/implicit status.
+7. Write the gate result table to `verify-report.md`:
+   - Table columns: `gate | status | required | on_fail | detail`
+   - Include a row for every evaluated gate (including skipped and errored gates).
+   - Append a `## Quality Gates` section to `verify-report.md` (with any validation errors from step 2).
+8. **Fail-closed audit write (H1)**. When the policy is non-null the `gates.quality-gates` block is mandatory:
+   a. Write the audit block to `state.yaml` under `gates.quality-gates` (sibling of `gates.clarify`, `gates.4r-review-gate`).
+   b. Read it back and confirm `gates.quality-gates.status` persisted and equals the value built in step 6.
+   c. If the write throws OR the read-back does not match, set best-effort `gates.quality-gates.status: error` (sentinel) and return the agent envelope with `status: blocked` (NOT `success`) plus a `question_gate` describing the persistence failure. A declared policy MUST NEVER silently degrade to "absent".
+9. Set the overall verify outcome modifier:
+   - Any BLOCKER finding (halt-required `fail`/`error`) → overall outcome is `FAIL`
+   - Any WARNING finding (advisory-required `fail`/`error`) → overall outcome is `PASS WITH WARNINGS`
+   - No blocking findings → outcome unchanged (determined by spec compliance matrix)
+
+When the audit write succeeds (step 8b read-back matches), the agent envelope `status` field is `success` — it reports that the verification work was done; the `FAIL` / `PASS WITH WARNINGS` / `PASS` outcome lives in `verify-report.md` and `state.yaml.gates.quality-gates.status`. Only a persistence failure (step 8c) flips the envelope to `blocked`.
+
 Step 10 has two parts (10a and 10b). Both are mandatory — do NOT stop after 10a.
 
 ### Step 10a: Persist Verification Report

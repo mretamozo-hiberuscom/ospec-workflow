@@ -1,0 +1,108 @@
+schema: sdd-change-state
+change: declarative-quality-gates
+
+classification: normal
+
+session:
+  artifact_store: openspec
+  delivery_strategy: single-pr
+  execution_mode: interactive
+
+route:
+  intended_route: standard
+  actual_route: standard
+  route_rationale: "classification=normal and project.status=active; standard is first matching route after foundation/federated/debug/brownfield all failed."
+  validated: true
+  validation_errors: []
+
+status: archived
+last_updated: 2026-06-21T23:45:00Z
+
+blocking_questions: []
+
+approvals:
+  - id: clarify-coverage-measurement
+    gate: clarify
+    decision: separate-coverage-command
+    detail: "tests.coverage.command optional field; stdout is the coverage number; skip-with-warning when unset."
+    source: AskUserQuestion
+    accepted_at: 2026-06-21T15:00:00Z
+    applies_to: [sdd-design, sdd-tasks]
+  - id: clarify-on-fail-default
+    gate: clarify
+    decision: advisory-only-default
+    detail: "on_fail default stays advisory regardless of required; user must declare on_fail: halt explicitly to block."
+    source: AskUserQuestion
+    accepted_at: 2026-06-21T15:00:00Z
+    applies_to: [sdd-design, sdd-tasks]
+  - id: clarify-archive-override
+    gate: clarify
+    decision: override-with-mandatory-audit
+    detail: "User may force archive past a failed halt gate with a written justification, recorded in state.yaml (gates.quality-gates.override) and verify-report.md with timestamp."
+    source: AskUserQuestion
+    accepted_at: 2026-06-21T15:00:00Z
+    applies_to: [sdd-design, sdd-tasks]
+  - id: review-workload-001
+    gate: review-workload
+    decision: size-exception
+    detail: "Forecast High (~650 lines, 7 files) with single-pr strategy; user approved size:exception to deliver as one PR."
+    source: AskUserQuestion
+    accepted_at: 2026-06-21T18:45:00Z
+    applies_to: [sdd-apply]
+
+phases:
+  proposal:
+    status: done
+    artifact: openspec/changes/declarative-quality-gates/proposal.md
+  spec:
+    status: done
+    artifacts:
+      - openspec/changes/declarative-quality-gates/specs/quality-gates/spec.md
+      - openspec/changes/declarative-quality-gates/specs/agents/spec.md
+      - openspec/changes/declarative-quality-gates/specs/routing/spec.md
+  clarify:
+    status: done
+    questions_asked: 3
+  design:
+    status: done
+    artifact: openspec/changes/declarative-quality-gates/design.md
+    note: "Amended for 4R remediation: added Effect-Layer Hardening section (H1-H7), failed-write/override-guard sequence, updated file-changes + testing strategy."
+  tasks:
+    status: done
+    artifact: openspec/changes/declarative-quality-gates/tasks.md
+  apply:
+    status: done
+    artifact: openspec/changes/declarative-quality-gates/apply-progress.md
+    note: "Batch 2 (4r-critical-1) complete: H1-H7 implemented. Pure layer TDD 671/671 GREEN; effect layer prose contracts updated."
+  verify:
+    status: done
+    artifact: openspec/changes/declarative-quality-gates/verify-report.md
+    outcome: PASS
+    note: "Re-verify after 4R-CRITICAL remediation (H1-H7): PASS. 671/671 tests, original CRITICAL closed by H1+H2, W2 by H3."
+  archive:
+    status: done
+    artifact: openspec/changes/declarative-quality-gates/archive-report.md
+
+remediation:
+  cycle: 4r-critical-1
+  trigger: 4r-review-gate
+  route: design -> apply -> verify
+  status: done
+  design_amended: true
+  apply_complete: true
+  reverify_outcome: PASS
+  decisions_added: [H1, H2, H3, H4, H5, H6, H7]
+
+gates:
+  4r-review-gate:
+    status: done
+    on_blocker: advisory
+    findings_summary: "0 BLOCKER, 1 CRITICAL, 7 WARNING, 6 SUGGESTION"
+    surfaced_to_user: true
+    critical:
+      - source: review-resilience
+        title: "Partial audit write creates silent archive bypass"
+        detail: "If the state.yaml gates.quality-gates write fails silently while sdd-verify still returns status: success, the orchestrator sees the key as 'absent' and dispatches archive normally, skipping a genuine required halt gate. Converges with review-risk W2 (archive-dispatch guard only reads state.yaml status, not verify-report.md ## Override presence)."
+        origin: design-gap
+
+open_decisions: []
