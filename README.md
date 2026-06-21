@@ -10,7 +10,7 @@ generador (`scripts/configure/cli.js`) produce un árbol nativo y validado de ca
 `dist/<target>/` sin tocar el origen. Un solo source, tres destinos. Ver
 [Compatibilidad multi-target](#compatibilidad-multi-target).
 
-La versión actual es **2.4.9**. El usuario trabaja con `sdd-orchestrator`; el orquestador coordina, los
+La versión actual es **2.5.0**. El usuario trabaja con `sdd-orchestrator`; el orquestador coordina, los
 agentes de fase ejecutan y OpenSpec conserva el estado versionable.
 
 ## Inicio rápido
