@@ -1,0 +1,106 @@
+schema: sdd-change-state
+change: project-operative-memory
+
+classification: normal
+
+session:
+  artifact_store: openspec
+  delivery_strategy: single-pr
+
+status: archived
+last_updated: 2026-06-21T05:26:45Z
+
+route:
+  intended_route: standard
+  actual_route: standard
+  route_rationale: "classification=normal and project.status=active matched the standard route after foundation/federated/debug/brownfield conditions failed."
+  validated: true
+  validation_errors: []
+
+blocking_questions: []
+
+approvals:
+  - id: clarify-q1-conventions-write
+    gate: clarify
+    decision: manual-human-curation
+    source: AskUserQuestion
+    accepted_at: 2026-06-20T12:40:00Z
+    applies_to: [sdd-design, sdd-tasks, sdd-apply]
+    note: "conventions.md is read-only for agents; humans/periodic curation update it. sdd-apply adds NO new write step for conventions.md."
+  - id: clarify-q2-open-decisions-schema
+    gate: clarify
+    decision: accept-de-facto-schema
+    source: AskUserQuestion
+    accepted_at: 2026-06-20T12:40:00Z
+    applies_to: [sdd-design, sdd-tasks]
+    note: "Document the existing de-facto open_decisions schema (id, status, summary, resolution, phase, applies_to) as authoritative; no new normative data-model section in the spec."
+  - id: clarify-q3-verify-severity
+    gate: clarify
+    decision: severity-info-warning-blocker
+    source: AskUserQuestion
+    accepted_at: 2026-06-20T12:40:00Z
+    applies_to: [sdd-design, sdd-tasks, sdd-apply]
+    note: "sdd-verify severity taxonomy is {INFO < WARNING < BLOCKER}. INFO is never written to known-issues.md; WARNING and BLOCKER are."
+  - id: 4r-gate-remediation
+    gate: 4r-review-gate
+    decision: fix-all-including-suggestions
+    source: AskUserQuestion
+    accepted_at: 2026-06-20T16:45:00Z
+    applies_to: [sdd-apply, sdd-verify]
+    note: "Re-open apply to fix the 1 CRITICAL + all WARNING + all SUGGESTION findings, then re-verify. Findings cluster on the static contract test not pinning load-bearing strings, prose contradictions, and prompt-injection data-framing."
+  - id: store-location-openspec-memory
+    gate: design
+    decision: relocate-docs-memory-to-openspec-memory
+    source: AskUserQuestion
+    accepted_at: 2026-06-21T00:00:00Z
+    applies_to: [sdd-design, sdd-spec, sdd-apply, sdd-verify]
+    note: "Operative-memory store relocated from docs/memory/ to openspec/memory/. Rationale: docs/ is documentation ABOUT the harness; the store is SDD workflow state and belongs under the canonical openspec/ root beside specs/ and changes/. Folded into THIS change (apply reopened); specs, skills, contract test, and the moved conventions.md stub all updated."
+
+phases:
+  proposal:
+    status: done
+    artifact: openspec/changes/project-operative-memory/proposal.md
+  spec:
+    status: done
+    artifacts:
+      - openspec/changes/project-operative-memory/specs/project-memory/spec.md
+      - openspec/changes/project-operative-memory/specs/agents/spec.md
+  clarify:
+    status: done
+    questions_asked: 3
+    artifacts:
+      - openspec/changes/project-operative-memory/specs/project-memory/spec.md
+      - openspec/changes/project-operative-memory/specs/agents/spec.md
+  design:
+    status: done
+    artifact: openspec/changes/project-operative-memory/design.md
+  tasks:
+    status: done
+    artifact: openspec/changes/project-operative-memory/tasks.md
+  apply:
+    status: done
+    artifact: openspec/changes/project-operative-memory/apply-progress.md
+    reopened_note: "Apply reopened to fold in the store relocation docs/memory/ -> openspec/memory/ (approval store-location-openspec-memory). Mechanical path change across the 3 skills, the contract test, the change specs, and the moved conventions.md stub."
+  verify:
+    status: done
+    artifact: openspec/changes/project-operative-memory/verify-report.md
+    verdict: PASS
+    stale_reason: "Prior PASS predates the conventions.md illustrative-example addition and the 4R round-3 remediation. Re-verification required before archive."
+    reverified_at: 2026-06-21T05:25:13Z
+    reverify_note: "Re-verification after the store relocation docs/memory/ -> openspec/memory/ (approval store-location-openspec-memory). Confirmed: no stray docs/memory references in skills, contract test (literals + path.join segments), or change specs/proposal/design-body/tasks/apply-progress; docs/memory/ removed; openspec/memory/conventions.md present with frontmatter + curation notice; decisions.md/known-issues.md NOT pre-created (lazy). All 5 approvals honored; prior 4R remediation (archive reorder, B4 line-by-line + area/workaround, B5 guards, last_updated gating, contract-test pins) still holds. 16/16 contract tests + npm test 602/602 green; 4-target regen clean. PASS, 0 CRITICAL, 0 WARNING (1 non-blocking INFO terminology note). Step 10b: no qualifying findings -> known-issues.md not written."
+  archive:
+    status: done
+    artifact: openspec/changes/project-operative-memory/archive-report.md
+
+gates:
+  clarify:
+    status: done
+    questions_asked: 3
+  4r-review-gate:
+    status: done
+    on_blocker: advisory
+    findings_summary: "0 BLOCKER, 1 CRITICAL, 9 WARNING (2 overlap), 4 SUGGESTION"
+    surfaced_to_user: true
+    theme: "Static contract test does not pin several load-bearing strings it claims to (severity no-INFO-write, prepend/newest-first, lazy skip); plus prose contradictions (ownership append vs prepend; de-facto vs authoritative) and prompt-injection data-framing gap."
+
+open_decisions: []
