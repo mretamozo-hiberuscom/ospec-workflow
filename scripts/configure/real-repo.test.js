@@ -396,3 +396,59 @@ test(
     `routing table must be valid after C1 update; errors: ${JSON.stringify(tableResult.errors)}`,
   );
 });
+
+test("real repo: orchestrator pointer-table refs resolve and handler sentinels absent from body", () => {
+  // Read the orchestrator source file from ROOT (not a dist target)
+  const orchestratorPath = path.join(ROOT, "agents", "sdd-orchestrator.agent.md");
+  assert.ok(fs.existsSync(orchestratorPath), "sdd-orchestrator.agent.md must exist at agents/");
+  const text = fs.readFileSync(orchestratorPath, "utf8");
+  const lines = text.split("\n");
+
+  // Guard: body must be below 700 lines after thinning (lenient guard against re-inlining)
+  assert.ok(
+    lines.length < 700,
+    `orchestrator body must be < 700 lines; got ${lines.length}`
+  );
+
+  // Sentinel absence: these strings must NOT appear in the orchestrator body after extraction
+  assert.doesNotMatch(text, /_brownfield_advisory_shown/, "brownfield sentinel must not be inline in orchestrator body");
+  assert.doesNotMatch(text, /findings_summary/, "4R sentinel must not be inline in orchestrator body");
+  assert.doesNotMatch(text, /federation-baseline-orchestrator/, "federation sentinel must not be inline in orchestrator body");
+  assert.doesNotMatch(text, /planExecution/, "lifecycle sentinel planExecution must not be inline in orchestrator body");
+  assert.doesNotMatch(text, /before-task\.occurrences/, "lifecycle sentinel before-task.occurrences must not be inline in orchestrator body");
+  assert.doesNotMatch(text, /Two-place override/, "archive sentinel Two-place override must not be inline in orchestrator body");
+  assert.doesNotMatch(text, /parseQualityGates/, "archive sentinel parseQualityGates must not be inline in orchestrator body");
+
+  // Pointer table: extract skills/_shared/*.md refs and verify each resolves to an existing file
+  const refRegex = /`(skills\/_shared\/[^`]+\.md)`/g;
+  const refs = [...text.matchAll(refRegex)].map((m) => m[1]);
+  assert.ok(refs.length > 0, "orchestrator must reference at least one skills/_shared/*.md file via pointer table");
+  for (const ref of refs) {
+    assert.ok(
+      fs.existsSync(path.join(ROOT, ref)),
+      `pointer-table ref \`${ref}\` in orchestrator must resolve to an existing file`
+    );
+  }
+
+  // Sentinel migration: each sentinel must be present in its designated _shared/ file
+  const sentinelFiles = [
+    { sentinel: "_brownfield_advisory_shown", file: "skills/_shared/route-brownfield.md" },
+    { sentinel: "findings_summary", file: "skills/_shared/gate-4r-review.md" },
+    { sentinel: "federation-baseline-orchestrator", file: "skills/_shared/route-federation.md" },
+    { sentinel: "planExecution", file: "skills/_shared/dispatch-lifecycle-hooks.md" },
+    { sentinel: "before-task.occurrences", file: "skills/_shared/dispatch-lifecycle-hooks.md" },
+    { sentinel: "Two-place override", file: "skills/_shared/gate-archive-quality.md" },
+    { sentinel: "parseQualityGates", file: "skills/_shared/gate-archive-quality.md" },
+  ];
+  for (const { sentinel, file } of sentinelFiles) {
+    const filePath = path.join(ROOT, file);
+    assert.ok(fs.existsSync(filePath), `${file} must exist (sentinel migration target)`);
+    const fileText = fs.readFileSync(filePath, "utf8");
+    const escapedSentinel = sentinel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    assert.match(
+      fileText,
+      new RegExp(escapedSentinel),
+      `sentinel "${sentinel}" must be present in ${file} after migration`
+    );
+  }
+});

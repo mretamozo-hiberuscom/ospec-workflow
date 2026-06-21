@@ -9,6 +9,9 @@ const ROOT_DIR = path.resolve(__dirname, "..");
 const ORCHESTRATOR_AGENT_PATH = path.join(ROOT_DIR, "agents", "sdd-orchestrator.agent.md");
 const BASELINE_AGENT_PATH = path.join(ROOT_DIR, "agents", "sdd-baseline.agent.md");
 const BASELINE_SKILL_PATH = path.join(ROOT_DIR, "skills", "sdd-baseline", "SKILL.md");
+// After refactor-orchestrator-lazy, federation logic lives in the _shared/ handler file
+// that the orchestrator reads on-demand via the pointer table.
+const FEDERATION_SHARED_PATH = path.join(ROOT_DIR, "skills", "_shared", "route-federation.md");
 
 async function fileContains(filePath, pattern) {
   const content = await fs.readFile(filePath, "utf8");
@@ -16,6 +19,17 @@ async function fileContains(filePath, pattern) {
     return pattern.test(content);
   }
   return content.includes(pattern);
+}
+
+// Checks pattern against the orchestrator body AND the federation _shared/ handler.
+// The behavioral contract is satisfied when the content is in EITHER location: the
+// orchestrator loads the _shared/ handler on-demand via its pointer table, so the
+// logic is accessible regardless of which file carries it.
+async function orchestratorOrFederationContains(pattern) {
+  return (
+    (await fileContains(ORCHESTRATOR_AGENT_PATH, pattern)) ||
+    (await fileContains(FEDERATION_SHARED_PATH, pattern))
+  );
 }
 
 test("5.1.1 · sdd-orchestrator.agent.md contains section for federation baseline loop", async () => {
@@ -37,24 +51,24 @@ test("5.1.2 · sdd-orchestrator.agent.md contains vscode/askQuestions in gate co
 test("5.1.3 · sdd-orchestrator.agent.md contains continue-log-retry logic description", async () => {
   const pattern = /continue-log-retry|no abortar/i;
   assert.ok(
-    await fileContains(ORCHESTRATOR_AGENT_PATH, pattern),
-    "Orchestrator agent must describe continue-log-retry policy"
+    await orchestratorOrFederationContains(pattern),
+    "Orchestrator agent or its _shared/ federation handler must describe continue-log-retry policy"
   );
 });
 
 test("5.1.4 · sdd-orchestrator.agent.md contains retry-failed mechanism", async () => {
   const pattern = /retry-failed|--retry-failed/i;
   assert.ok(
-    await fileContains(ORCHESTRATOR_AGENT_PATH, pattern),
-    "Orchestrator agent must support retry-failed flag"
+    await orchestratorOrFederationContains(pattern),
+    "Orchestrator agent or its _shared/ federation handler must support retry-failed flag"
   );
 });
 
 test("5.1.5 · sdd-orchestrator.agent.md references federation-baseline-orchestrator", async () => {
   const pattern = /federation-baseline-orchestrator/i;
   assert.ok(
-    await fileContains(ORCHESTRATOR_AGENT_PATH, pattern),
-    "Orchestrator agent must reference the library"
+    await orchestratorOrFederationContains(pattern),
+    "Orchestrator agent or its _shared/ federation handler must reference the library"
   );
 });
 
@@ -111,8 +125,8 @@ test("5.1.12 · SKILL.md mentions member-local write target", async () => {
 test("5.1.13 · sdd-orchestrator.agent.md mentions read-and-link boundary D10", async () => {
   const pattern = /read-and-link|D10/i;
   assert.ok(
-    await fileContains(ORCHESTRATOR_AGENT_PATH, pattern),
-    "Orchestrator must document read-and-link boundary D10"
+    await orchestratorOrFederationContains(pattern),
+    "Orchestrator or its _shared/ federation handler must document read-and-link boundary D10"
   );
 });
 

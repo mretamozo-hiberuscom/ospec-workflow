@@ -1,0 +1,78 @@
+change: refactor-orchestrator-lazy
+created_at: "2026-06-21T00:00:00Z"
+last_updated: "2026-06-22T01:05:37+02:00"
+status: verified
+classification: normal
+blocking_questions: []
+
+route:
+  intended_route: standard
+  actual_route: standard
+  route_rationale: "First-match-wins: foundation/federated/debug/brownfield conditions all false (project.status active, backend openspec, no debug intent, baseline done with specs present); standard matched on project.status: active."
+  validated: true
+  validation_errors: []
+
+session:
+  execution_mode: interactive
+  delivery_strategy: exception-ok
+  reply_language: es
+
+phases:
+  explore:
+    status: done
+    note: "Exploration completed inline in the originating session (orchestrator size + coupling analysis)."
+  propose:
+    status: done
+    artifact: "openspec/changes/refactor-orchestrator-lazy/proposal.md"
+  spec:
+    status: done
+    artifacts:
+      - "openspec/changes/refactor-orchestrator-lazy/specs/agents/spec.md"
+  clarify:
+    status: done
+    questions_asked: 0
+    note: "0-question fast-path: no material ambiguities detected. sdd-spec residual_ambiguity: false confirmed."
+  design:
+    status: done
+    artifact: "openspec/changes/refactor-orchestrator-lazy/design.md"
+  tasks:
+    status: done
+    artifact: "openspec/changes/refactor-orchestrator-lazy/tasks.md"
+  apply:
+    status: done
+    artifact: "openspec/changes/refactor-orchestrator-lazy/apply-progress.md"
+    measured_lines: 607
+    reduction_pct: 38
+  verify:
+    status: done
+  archive:
+    status: done
+
+gates:
+  clarify: { status: done }
+  4r-review-gate:
+    status: done
+    on_blocker: advisory
+    findings_summary: "0 BLOCKER, 0 CRITICAL, 0 WARNING, 0 SUGGESTION"
+    surfaced_to_user: false
+
+approvals:
+  - id: execution-mode-001
+    gate: execution-mode
+    decision: interactive
+    source: AskUserQuestion
+    accepted_at: "2026-06-21T00:00:00Z"
+    applies_to: [orchestrator]
+  - id: delivery-strategy-001
+    gate: delivery-strategy
+    decision: exception-ok
+    source: AskUserQuestion
+    accepted_at: "2026-06-21T00:00:00Z"
+    applies_to: [sdd-tasks, sdd-apply]
+  - id: success-criterion-001
+    gate: success-criterion
+    decision: strict-verbatim-parity-min35pct
+    detail: "El '~480 lineas' no es alcanzable bajo paridad verbatim estricta; reformulado a reduccion >=35% del cuerpo siempre cargado, registrando el numero medido en apply. Sin condensado de prosa (scope no ampliado)."
+    source: AskUserQuestion
+    accepted_at: "2026-06-22T00:00:00Z"
+    applies_to: [sdd-apply, sdd-verify]

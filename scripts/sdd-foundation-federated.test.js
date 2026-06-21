@@ -9,9 +9,20 @@ const ROOT = path.resolve(__dirname, "..");
 const SKILL = path.join(ROOT, "skills", "sdd-foundation", "SKILL.md");
 const AGENT = path.join(ROOT, "agents", "sdd-foundation.agent.md");
 const ORCHESTRATOR = path.join(ROOT, "agents", "sdd-orchestrator.agent.md");
+// After refactor-orchestrator-lazy, federation logic lives in the _shared/ handler file
+// that the orchestrator reads on-demand via the pointer table.
+const FEDERATION_SHARED = path.join(ROOT, "skills", "_shared", "route-federation.md");
 
 function read(file) {
   return fs.readFileSync(file, "utf8");
+}
+
+// Returns the concatenated text of the orchestrator and its federation _shared/ handler.
+// The behavioral contract is satisfied when the content is in EITHER location.
+function orchestratorAndFederationText() {
+  const orchText = read(ORCHESTRATOR);
+  const fedText = fs.existsSync(FEDERATION_SHARED) ? read(FEDERATION_SHARED) : "";
+  return orchText + "\n" + fedText;
 }
 
 // --- skills/sdd-foundation/SKILL.md -------------------------------------------
@@ -122,11 +133,13 @@ test("agent.md documents gaps mapping and roadmap consolidation", () => {
 // --- agents/sdd-orchestrator.agent.md -----------------------------------------
 
 test("orchestrator.agent.md documents routing to sdd-foundation with federated parameters", () => {
-  const text = read(ORCHESTRATOR);
+  // After refactor-orchestrator-lazy, federation routing lives in _shared/route-federation.md
+  // (loaded on-demand via the pointer table). Check the combined text.
+  const text = orchestratorAndFederationText();
   assert.match(
     text,
     /sdd-foundation[\s\S]{0,300}?(federated|federado|workspace\.yaml)/i,
-    "orchestrator.agent.md must describe routing/delegating to sdd-foundation with federated parameters"
+    "orchestrator.agent.md or its _shared/ federation handler must describe routing to sdd-foundation with federated parameters"
   );
 });
 
