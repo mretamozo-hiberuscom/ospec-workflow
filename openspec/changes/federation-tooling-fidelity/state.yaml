@@ -1,0 +1,59 @@
+change: federation-tooling-fidelity
+created_at: "2026-06-22T00:00:00Z"
+classification: normal
+status: ready-for-verify
+last_updated: "2026-06-22T18:00:00Z"
+blocking_questions: []
+
+route:
+  intended_route: standard
+  actual_route: standard
+  route_rationale: "First-match: project.status=active matched 'standard'; foundation/federated/debug/brownfield conditions all unmet (backend=openspec, baseline.status=done, no debug intent)."
+  validated: true
+  validation_errors: []
+
+execution:
+  mode: automatic
+  delivery_strategy: exception-ok
+
+phases:
+  propose:
+    status: done
+    artifact: "openspec/changes/federation-tooling-fidelity/proposal.md"
+  spec:
+    status: done
+    artifacts:
+      - "openspec/changes/federation-tooling-fidelity/specs/generator/spec.md"
+      - "openspec/changes/federation-tooling-fidelity/specs/federation-markers/spec.md"
+  clarify:
+    status: done
+  design:
+    status: done
+    artifact: "openspec/changes/federation-tooling-fidelity/design.md"
+  tasks:
+    status: done
+    artifact: "openspec/changes/federation-tooling-fidelity/tasks.md"
+  apply:
+    status: done
+    artifact: "openspec/changes/federation-tooling-fidelity/apply-progress.md"
+  verify:
+    status: pending
+  archive:
+    status: pending
+
+approvals:
+  - id: execution-mode-001
+    gate: execution-mode
+    decision: automatic
+    source: AskUserQuestion
+    accepted_at: "2026-06-22T00:00:00Z"
+    applies_to:
+      - all-phases
+  - id: delivery-strategy-001
+    gate: delivery-strategy
+    decision: exception-ok
+    source: AskUserQuestion
+    accepted_at: "2026-06-22T00:00:00Z"
+    applies_to:
+      - sdd-tasks
+      - sdd-apply
