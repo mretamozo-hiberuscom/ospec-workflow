@@ -66,22 +66,43 @@ atomically in `openspec/changes/{change-name}/federation-baseline-status.yaml`:
 unified_gate:
   status: approved
   approved_at: <ISO 8601 UTC>
-  approver: vscode/askQuestions
+  approver: orchestrator/askQuestions
 ```
+
+The `approver` field MUST be set to the target-agnostic value
+`orchestrator/askQuestions`. The recorded value MUST NOT contain any per-target
+namespace prefix; specifically, it MUST NOT contain the substrings `vscode/`,
+`copilot/`, `opencode/`, or `claude/`.
 
 The write MUST use the temp+rename pattern (see `explore-transactional-barrier`
 spec). The gate record is the canonical evidence of approval. Conversation
 history alone MUST NOT be treated as approval evidence for any downstream phase
 or re-launch.
 
+(Previously: `approver` was normatively pinned to `vscode/askQuestions`, a
+per-target namespace prefix rejected by the per-target validators for
+`github-copilot` and `opencode` (`/vscode\//i` residue check), causing
+`npm run build:copilot` and `npm run build:opencode` to exit 1 after
+`federation-baseline-orchestrator.js` was added to `SKILL_ENTRY_SCRIPTS`.)
+
 #### Scenario: Approval written to state file atomically
 
 - GIVEN the user has approved the unified domain-map gate
 - WHEN the orchestrator records the approval
 - THEN `unified_gate.status` is set to `approved`, `approved_at` is set to the
-  current UTC timestamp, `approver` is set to `vscode/askQuestions`
+  current UTC timestamp, and `approver` is set to `orchestrator/askQuestions`
 - AND the write is atomic (temp+rename)
 - AND subsequent reads of the state file confirm `status: approved`
+
+#### Scenario: Approver value is target-agnostic across all build targets
+
+- GIVEN a unified gate approval being recorded for any of the four build targets
+  (`claude`, `vscode`, `github-copilot`, `opencode`)
+- WHEN the orchestrator writes the approval record to
+  `federation-baseline-status.yaml`
+- THEN `unified_gate.approver` MUST equal exactly `orchestrator/askQuestions`
+- AND the value MUST NOT contain any of the substrings `vscode/`, `copilot/`,
+  `opencode/`, or `claude/`
 
 #### Scenario: Approval record missing — gate must be re-presented
 

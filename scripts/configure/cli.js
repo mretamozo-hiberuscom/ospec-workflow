@@ -113,6 +113,11 @@ function gatherRuntimeScripts(sourceDir) {
 
   // Seed skill entry-point scripts as additional BFS roots
   for (const rel of SKILL_ENTRY_SCRIPTS) {
+    // Defensive guard: even though SKILL_ENTRY_SCRIPTS is curated, a transitively-
+    // required generator-only module (e.g. a target-* profile or model-resolver)
+    // must never leak into a target dist. The guard is applied here and again
+    // in the BFS loop below so exclusion is unconditional regardless of how a
+    // path is reached.
     if (!isExcludedRuntimeScript(rel)) {
       queue.push(rel);
     }

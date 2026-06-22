@@ -82,7 +82,7 @@ generated_at: <ISO 8601>          # Timestamp of last write
 unified_gate:
   status: pending | approved      # Unified batch-0 gate status
   approved_at: <ISO 8601 | null>  # When approval was recorded; null if not yet approved
-  approver: <string | null>       # Source of approval (e.g., "vscode/askQuestions")
+  approver: <string | null>       # Source of approval (e.g., "orchestrator/askQuestions")
 members:
   - id: <string>                  # member.id from the canonical marker
     target_dir: <string>          # Path to the member repository root

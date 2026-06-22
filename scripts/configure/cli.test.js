@@ -338,3 +338,70 @@ test("G3: gatherRuntimeScripts includes a non-excluded transitive dep of a skill
 
   assert.ok(paths.includes("scripts/lib/some-dep.js"), "non-excluded transitive dep must be in dist");
 });
+
+// ---------------------------------------------------------------------------
+// G4 — Transitive require to scripts/configure/ is excluded from dist
+// ---------------------------------------------------------------------------
+
+test("G4: gatherRuntimeScripts excludes modules under scripts/configure/ required transitively", (t) => {
+  // Guard under test: isExcludedRuntimeScript — branch
+  // `if (rel.startsWith("scripts/configure/")) return true`.
+  // If that branch were removed, scripts/configure/some-generator.js would
+  // be enqueued and appear in the output, failing the assertion below.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-g4-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  fs.mkdirSync(path.join(dir, "scripts/hooks"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "scripts/configure"), { recursive: true });
+
+  // Hook that transitively requires a module under scripts/configure/
+  fs.writeFileSync(
+    path.join(dir, "scripts/hooks/hook.js"),
+    '"use strict";\nrequire("../configure/some-generator.js");\n',
+  );
+  fs.writeFileSync(path.join(dir, "scripts/configure/some-generator.js"), '"use strict";\n');
+
+  const paths = gatherRuntimeScripts(dir).map((f) => f.path);
+
+  assert.ok(paths.includes("scripts/hooks/hook.js"), "hook must be in dist");
+  assert.ok(
+    !paths.includes("scripts/configure/some-generator.js"),
+    "modules under scripts/configure/ must be excluded even when required transitively",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// G5 — Transitive require to frontmatter.js / model-resolver.js is excluded
+// ---------------------------------------------------------------------------
+
+test("G5: gatherRuntimeScripts excludes frontmatter.js and model-resolver.js required transitively", (t) => {
+  // Guard under test: isExcludedRuntimeScript — branch
+  // `if (base === "frontmatter.js" || base === "model-resolver.js") return true`.
+  // If that branch were removed, both files would appear in the output,
+  // failing the assertions below.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-g5-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  fs.mkdirSync(path.join(dir, "scripts/hooks"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "scripts/lib"), { recursive: true });
+
+  // Hook that transitively requires both generator-only named modules
+  fs.writeFileSync(
+    path.join(dir, "scripts/hooks/hook.js"),
+    '"use strict";\nrequire("../lib/frontmatter.js");\nrequire("../lib/model-resolver.js");\n',
+  );
+  fs.writeFileSync(path.join(dir, "scripts/lib/frontmatter.js"), '"use strict";\n');
+  fs.writeFileSync(path.join(dir, "scripts/lib/model-resolver.js"), '"use strict";\n');
+
+  const paths = gatherRuntimeScripts(dir).map((f) => f.path);
+
+  assert.ok(paths.includes("scripts/hooks/hook.js"), "hook must be in dist");
+  assert.ok(
+    !paths.includes("scripts/lib/frontmatter.js"),
+    "frontmatter.js must be excluded from dist even when required transitively",
+  );
+  assert.ok(
+    !paths.includes("scripts/lib/model-resolver.js"),
+    "model-resolver.js must be excluded from dist even when required transitively",
+  );
+});

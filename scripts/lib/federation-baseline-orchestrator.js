@@ -157,7 +157,11 @@ async function recordGateApproval(state, statusPath) {
   }
   state.unified_gate.status = "approved";
   state.unified_gate.approved_at = new Date().toISOString();
-  state.unified_gate.approver = "vscode/askQuestions";
+  // Target-agnostic identifier: uses the "orchestrator/<action>" format with no
+  // per-target namespace prefix. This value is written into the generated status
+  // YAML and consumed by the federation baseline gate to record which agent
+  // approved the unified gate.
+  state.unified_gate.approver = "orchestrator/askQuestions";
   state.generated_at = new Date().toISOString();
 
   const yaml = serializeStatus(state);

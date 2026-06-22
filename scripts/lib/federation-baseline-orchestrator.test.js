@@ -298,7 +298,8 @@ test("4.1.22 · recordGateApproval updates status atomically", async (t) => {
 
     assert.strictEqual(state.unified_gate.status, "approved");
     assert.ok(state.unified_gate.approved_at);
-    assert.strictEqual(state.unified_gate.approver, "vscode/askQuestions");
+    assert.strictEqual(state.unified_gate.approver, "orchestrator/askQuestions");
+    assert.ok(!state.unified_gate.approver.includes("vscode/"), "approver must not contain vscode namespace residue");
 
     const content = await fs.readFile(statusPath, "utf8");
     assert.match(content, /status: approved/);

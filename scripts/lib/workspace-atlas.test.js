@@ -840,3 +840,36 @@ test("F3: mergeMarkersIntoAtlas does not inject surface key when provides entry 
   assert.deepEqual(contract.consumers, []);
 });
 
+// ---------------------------------------------------------------------------
+// F4 — explicit surface: null is not copied into the derived contract
+// ---------------------------------------------------------------------------
+
+test("F4: mergeMarkersIntoAtlas does not inject surface key when provides entry has surface: null", () => {
+  // Guard under test: workspace-atlas.js — the `value === null` branch in the
+  // passthrough loop (`if (value === undefined || value === null) continue`).
+  // If that branch were removed, `surface: null` would be assigned to the
+  // contract object and both assertions below would fail.
+  const { atlas } = mergeMarkersIntoAtlas([
+    buildMarker({
+      id: "svc-nullsurface",
+      updatedAt: "2026-06-17T10:00:00Z",
+      provides: [{ id: "svc-nullsurface-api", consumers: [], surface: null }],
+    }),
+  ]);
+
+  assert.equal(atlas.contracts.length, 1);
+  const contract = atlas.contracts[0];
+
+  assert.ok(
+    !Object.prototype.hasOwnProperty.call(contract, "surface"),
+    "contract must NOT have a surface key when the provided value is null",
+  );
+  assert.equal(contract.id, "svc-nullsurface-api");
+  assert.equal(contract.provider, "svc-nullsurface");
+  assert.deepEqual(contract.consumers, []);
+
+  // Defense-in-depth: the serialized YAML must not contain a `surface: null` line.
+  const yaml = serializeAtlas(atlas);
+  assert.ok(!yaml.includes("surface: null"), "serialized YAML must not contain surface: null");
+});
+
