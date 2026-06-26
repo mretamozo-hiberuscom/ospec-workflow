@@ -60,13 +60,17 @@ function copyBinaryToTree(outDir, target, sourceDir) {
   }
 
   for (const dest of destinations) {
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    fs.copyFileSync(srcBin, dest);
-    // Set executable bit on POSIX systems so the shell can invoke the binary.
-    if (process.platform !== "win32") {
-      fs.chmodSync(dest, 0o755);
+    try {
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(srcBin, dest);
+      // Set executable bit on POSIX systems so the shell can invoke the binary.
+      if (process.platform !== "win32") {
+        fs.chmodSync(dest, 0o755);
+      }
+      process.stdout.write(`  + ospec-hooks${ext} -> ${path.relative(outDir, dest)}\n`);
+    } catch (err) {
+      process.stderr.write(`[warn] failed to copy binary to ${dest}: ${err.message}. Continuing sync.\n`);
     }
-    process.stdout.write(`  + ospec-hooks${ext} -> ${path.relative(outDir, dest)}\n`);
   }
 }
 
@@ -94,10 +98,57 @@ function assertSafeDest(destDir, sourceDir) {
     throw new Error(`refusing to sync into ${abs}: ${reason}`);
   };
 
-  if (abs === path.parse(abs).root) refuse("filesystem root");
+  let canonicalAbs = abs;
+  let canonicalSrc = path.resolve(sourceDir);
+  try {
+    canonicalAbs = fs.realpathSync(abs);
+  } catch (e) {
+    if (e.code !== "ENOENT") throw e;
+  }
+  try {
+    canonicalSrc = fs.realpathSync(canonicalSrc);
+  } catch (e) {
+    if (e.code !== "ENOENT") throw e;
+  }
+
+  const isCaseInsensitive = process.platform === "win32" || process.platform === "darwin";
+
+  // Enforce safety checks on canonical paths to prevent symlink bypasses
+  if (canonicalAbs === path.parse(canonicalAbs).root) refuse("filesystem root");
   const home = os.homedir();
-  if (home && abs === path.resolve(home)) refuse("home directory");
-  if (abs === path.resolve(sourceDir)) refuse("equals the source repo (would overwrite the harness)");
+  if (home) {
+    let canonicalHome = path.resolve(home);
+    try {
+      canonicalHome = fs.realpathSync(canonicalHome);
+    } catch (e) {
+      if (e.code !== "ENOENT") throw e;
+    }
+    const equalsHome = isCaseInsensitive
+      ? canonicalAbs.toLowerCase() === canonicalHome.toLowerCase()
+      : canonicalAbs === canonicalHome;
+    if (equalsHome) refuse("home directory");
+  }
+
+  const equalsSrc = isCaseInsensitive
+    ? canonicalAbs.toLowerCase() === canonicalSrc.toLowerCase()
+    : canonicalAbs === canonicalSrc;
+
+  if (equalsSrc) {
+    refuse("equals the source repo (would overwrite the harness)");
+  }
+
+  // Prevent directory recursion or nested overwrites
+  const relative = path.relative(canonicalSrc, canonicalAbs);
+  const isDescendant = relative && !relative.startsWith("..") && !path.isAbsolute(relative);
+  if (isDescendant) {
+    refuse("inside the source repository (nested target write)");
+  }
+
+  const relativeBack = path.relative(canonicalAbs, canonicalSrc);
+  const isAncestor = relativeBack && !relativeBack.startsWith("..") && !path.isAbsolute(relativeBack);
+  if (isAncestor) {
+    refuse("contains the source repository (would overwrite the harness root)");
+  }
 }
 
 function main(argv) {
