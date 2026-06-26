@@ -26,6 +26,7 @@ type SkillEntry struct {
 	Path         string   `json:"path"`
 	Triggers     []string `json:"triggers"`
 	CompactRules []string `json:"compact_rules"`
+	Capabilities []string `json:"capabilities"`
 }
 
 // FingerprintPath pairs a file's absolute path with its workspace-relative
@@ -115,6 +116,7 @@ func DiscoverSkills(root string) (*DiscoveryResult, error) {
 			Path:         fp.RelativePath,
 			Triggers:     extractTriggers(attrs["description"], id),
 			CompactRules: extractCompactRules(body),
+			Capabilities: extractCapabilities(attrs["capabilities"]),
 		})
 	}
 	sort.Slice(skills, func(i, j int) bool {
@@ -278,6 +280,28 @@ func extractTriggers(description, fallback string) []string {
 		return []string{fallback}
 	}
 	return triggers
+}
+
+// extractCapabilities parses the "capabilities: [cap1, cap2]" metadata from YAML.
+func extractCapabilities(raw string) []string {
+	str := strings.TrimSpace(raw)
+	if strings.HasPrefix(str, "[") {
+		str = str[1:]
+	}
+	if strings.HasSuffix(str, "]") {
+		str = str[:len(str)-1]
+	}
+	var caps []string
+	for _, part := range strings.FieldsFunc(str, func(r rune) bool { return r == ',' || r == ';' }) {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			caps = append(caps, part)
+		}
+	}
+	if caps == nil {
+		return []string{} // ensure it serializes as [] instead of null
+	}
+	return caps
 }
 
 // extractCompactRules extracts up to 15 rules from a rules/constraints section.

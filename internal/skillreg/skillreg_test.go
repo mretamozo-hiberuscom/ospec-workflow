@@ -28,7 +28,7 @@ func makePluginRoot(t *testing.T) string {
 	}
 	if err := os.WriteFile(
 		filepath.Join(root, "skills", "example", "SKILL.md"),
-		[]byte("---\nname: example\ndescription: \"Example skill. Trigger: JavaScript, hooks\"\n---\n\n## Hard Rules\n\n- Keep output deterministic.\n- Do not mutate OpenSpec.\n"),
+		[]byte("---\nname: example\ndescription: \"Example skill. Trigger: JavaScript, hooks\"\ncapabilities: [node-test, javascript-eval]\n---\n\n## Hard Rules\n\n- Keep output deterministic.\n- Do not mutate OpenSpec.\n"),
 		0644,
 	); err != nil {
 		t.Fatalf("write SKILL.md: %v", err)
@@ -91,6 +91,9 @@ func TestDiscoverSkills(t *testing.T) {
 		}
 		if skill.CompactRules[0] != "Keep output deterministic." {
 			t.Errorf("CompactRules[0]: got %q", skill.CompactRules[0])
+		}
+		if len(skill.Capabilities) != 2 || skill.Capabilities[0] != "node-test" || skill.Capabilities[1] != "javascript-eval" {
+			t.Errorf("Capabilities: got %v, want [node-test javascript-eval]", skill.Capabilities)
 		}
 	})
 
