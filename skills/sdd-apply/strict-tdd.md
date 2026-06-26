@@ -1,7 +1,7 @@
 # Strict TDD Module — Apply Phase
 
-> **This module is loaded ONLY when Strict TDD Mode is enabled AND a test runner is available.**
-> If you are reading this, the orchestrator already verified both conditions. Follow every instruction.
+> **This module is loaded ONLY when Strict TDD Mode is enabled.**
+> If you are reading this, the orchestrator already verified this condition. Follow every instruction.
 
 ## TDD Philosophy
 
@@ -22,8 +22,7 @@ FOR EACH TASK:
 ├── 0. SAFETY NET (only if modifying existing files)
 │   ├── Run existing tests for files being modified
 │   ├── Capture baseline: "{N} tests passing"
-│   ├── If any FAIL → STOP, report as "pre-existing failure"
-│   │   (do NOT fix pre-existing failures — report to orchestrator)
+│   ├── If any FAIL → STOP and report as "pre-existing failure" (do NOT fix them)
 │   └── This baseline proves you did not break what already worked
 │
 ├── 1. UNDERSTAND
@@ -36,8 +35,7 @@ FOR EACH TASK:
 ├── 2. RED — Write a failing test FIRST
 │   ├── Write test(s) that describe the expected behavior from the spec
 │   ├── Prefer pure functions where possible (no side effects = easy to test)
-│   ├── The test MUST reference production code that does NOT exist yet
-│   │   (this guarantees failure — no need to execute to confirm)
+│   ├── The test MUST reference the new behavior (or a new production signature, which can be stubbed with a minimal empty implementation/declaration in compiled/typed languages like Go, C#, or TypeScript so that tests compile but fail their assertions). This guarantees failure or compilation/assertion error.
 │   ├── If the production code/function already exists:
 │   │   └── Write a test for the NEW behavior that is NOT yet implemented
 │   └── GATE: Do NOT proceed to GREEN until the test is written
@@ -127,7 +125,7 @@ When executing tests during TDD:
 ├── Run ONLY the relevant test file, not the entire suite
 │   ├── JS/TS: {runner} {test-file-path} (e.g., pnpm vitest run src/utils/tax.test.ts)
 │   ├── Python: pytest {test-file-path}
-│   ├── Go: go test ./{package}/... -run {TestName}
+│   ├── Go: go test ./{package} -run {TestName}
 │   └── Adapt to the runner's CLI
 ├── This keeps the cycle FAST
 └── Full suite runs happen in sdd-verify, not here
@@ -181,11 +179,11 @@ When Strict TDD Mode is active, your return summary MUST include this section:
 
 ```markdown
 ### TDD Cycle Evidence
-| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
-|------|-----------|-------|------------|-----|-------|-------------|----------|
-| 1.1 | `path/test.ext` | Unit | ✅ 5/5 | ✅ Written | ✅ Passed | ✅ 3 cases | ✅ Clean |
-| 1.2 | `path/test.ext` | Integration | N/A (new) | ✅ Written | ✅ Passed | ➖ Single | ✅ Clean |
-| 1.3 | `path/test.ext` | Unit | ✅ 2/2 | ✅ Written | ✅ Passed | ✅ 2 cases | ➖ None needed |
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR | Notes / Rationale |
+|------|-----------|-------|------------|-----|-------|-------------|----------|-------------------|
+| 1.1 | `path/test.ext` | Unit | ✅ 5/5 | ✅ Written | ✅ Passed | ✅ 3 cases | ✅ Clean | |
+| 1.2 | `path/test.ext` | Integration | N/A (new) | ✅ Written | ✅ Passed | ➖ Single | ✅ Clean | |
+| 1.3 | `path/test.ext` | Unit | ✅ 2/2 | ✅ Written | STATIC_VALIDATED | ✅ 2 cases | ➖ None needed | Command execution restricted; static verification performed. |
 
 ### Test Summary
 - **Total tests written**: {N}
@@ -289,16 +287,16 @@ expect(screen.getByRole("button")).toHaveTextContent("Submit");  # Verifies real
 
 ### Mock Hygiene Rules
 
-**If you need more mocks than assertions, you are testing at the WRONG level.**
+**If you need more mocks than assertions, or write 7+ mocks in a single test case, you are testing at the WRONG level.**
 
 ```
 Mock/assertion ratio guide:
-├── ≤ 3 mocks for a test file → ✅ Healthy — focused test
-├── 4–6 mocks → ⚠️ Consider extracting logic to a pure function
-├── 7+ mocks → ❌ STOP — you are testing at the wrong layer
-│   ├── Extract the logic under test to a PURE FUNCTION and test it without mocks
-│   ├── OR move the test to integration/E2E layer where real dependencies exist
-│   └── NEVER write 10+ mocks to verify a one-line transformation
+├── ≤ 3 mocks for a test case → ✅ Healthy — focused test
+├── 4–6 mocks (and <= 2x assertions) → ⚠️ Consider extracting logic to a pure function
+└── 7+ mocks or mocks > 2x assertions → ❌ STOP — mock-heavy test (will trigger a WARNING during verification)
+    ├── Extract the logic under test to a PURE FUNCTION and test it without mocks
+    ├── OR move the test to integration/E2E layer where real dependencies exist
+    └── NEVER write 10+ mocks to verify a one-line transformation
 ```
 
 **Extract-Before-Mock Rule**: If the behavior you want to test is a data transformation, mapping, filtering, or conditional logic (e.g., `MUTED → FAIL` status conversion), EXTRACT it to a pure function FIRST, then test the pure function directly. No mocks needed.
@@ -352,13 +350,13 @@ expect(screen.getByRole("button")).toBeDisabled();
 ## Rules (Strict TDD specific)
 
 - NEVER write production code before writing its test — this is the ONE rule that cannot be broken
-- NEVER skip the GREEN execution gate — you MUST run tests and confirm they pass
+- NEVER skip the GREEN execution gate — you MUST run tests and confirm they pass (unless execution tools are unavailable/restricted, in which case you must perform rigorous static validation and mark the task status as `STATIC_VALIDATED` or `DEFERRED`)
 - NEVER skip triangulation when the spec defines multiple scenarios — hardcoded Fake It must be forced out
 - NEVER write trivial assertions (see Banned Assertion Patterns above) — they are WORSE than no test
 - ALWAYS verify that every assertion CALLS production code and asserts a SPECIFIC expected value
 - ALWAYS run the Safety Net before modifying existing files — protect what already works
 - ALWAYS report the TDD Cycle Evidence table — the verify phase will check it
-- If a test runner execution fails for infrastructure reasons (not test failures), report as "Blocked" and continue to next task
+- If a test runner execution fails for infrastructure reasons or command execution is unavailable, do not fake execution evidence. Instead, perform rigorous static verification, document the task as `STATIC_VALIDATED` or `DEFERRED` in the evidence table, and ensure execution is verified in a later environment-capable phase.
 - Prefer pure functions — but don't force it where it doesn't fit (e.g., React components with state)
 - For refactoring tasks, ALWAYS write approval tests before touching code
 - Run ONLY the relevant test file during the cycle, not the full suite
