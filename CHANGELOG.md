@@ -8,6 +8,28 @@ Plugin version tracks `.plugin.json` and `.claude-plugin/plugin.json`.
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-06-27
+
+### Added
+- **Validación de fases con rutas declarativas**: nueva librería `flow-validator.js` y script `validate-phase.js` que validan transiciones de fase contra las rutas declaradas en `openspec/config.yaml`, bloqueando transiciones inválidas antes de ejecutarlas.
+- **Ruta `bugfix`**: renombra la ruta `debug` a `bugfix` en la tabla de routing del orquestador, alineando la nomenclatura con Conventional Commits y añadiendo validaciones de transición al orquestador.
+- **Propagación de campos `provides[]` en markers de federación**: `mergeMarkersIntoAtlas` copia campos no reservados (como `surface`) desde los `provides[]` entries del marker al contrato derivado del atlas, habilitando metadatos de contratos inter-miembro.
+- **`SKILL_ENTRY_SCRIPTS` como roots del BFS de empaquetado**: los cuatro scripts de runtime de federación (`federation-marker.js`, `federation-explore.js`, `workspace-general-baseline.js`, `federation-baseline-orchestrator.js`) se añaden como roots explícitos del BFS en `gatherRuntimeScripts`, garantizando que el runtime de federación se empaquete en todos los targets.
+
+### Changed
+- **Eliminación de duplicación de prompts en agentes de fase**: refactorización de los agentes de fase para eliminar secciones de prompt duplicadas, consolidando la lógica en `sdd-phase-common.md`.
+- **Extracción de referencias de habilidades grandes**: corrección de enlaces rotos en skills y extracción de contenido extenso a subdirectorios `references/` para cumplir el límite de 500 líneas de SKILL.md.
+- **Relajación de deadlock en Strict TDD**: refinamiento de las reglas de mocks e higiene en el modo Strict TDD para evitar bloqueos cuando los tests requieren fixtures o mocks de infraestructura.
+- **Documentación de convenciones**: limpieza de configuraciones muertas en `openspec/config.yaml` y documentación formal de convenciones del proyecto.
+
+### Fixed
+- **Bypass de capitalización en `install-target.js` en Windows**: canonicalización de rutas con `path.resolve` para evitar que diferencias de capitalización de letra de unidad (`C:` vs `c:`) eludan las guardas de seguridad de destino.
+- **Paridad Go/JS en `session-start`**: corrección del bypass de `.gitignore` y alineación del comportamiento entre el binario Go y el fallback JS en el hook `session-start`.
+- **Campo `capabilities` en `SkillEntry`**: añadido el campo faltante `capabilities` a la estructura `SkillEntry` para paridad entre las implementaciones Go y Node.
+- **Propagación de errores de `fs.stat` en `cli.js`**: añadido `try-catch` para propagar correctamente errores de `fs.stat` en el pipeline de configuración.
+- **Contradicción de permisos en `sdd-workspace`**: eliminada la contradicción entre la documentación y el comportamiento real respecto a permisos de escritura en repositorios miembro.
+- **Approver neutral en `federation-baseline`**: neutralización del valor del approver a un valor target-agnóstico para evitar dependencias de plataforma en los gates de federación.
+
 ## [2.6.0] - 2026-06-22
 
 ### Added
