@@ -197,34 +197,60 @@ Consulta la [guía de instalación](docs/plugin-installation.md) para instalaci�
 
 ## Flujos
 
-El ciclo completo estándar es:
+El ciclo completo estándar recorre todas las fases de planificación, implementación y cierre:
 
 ```text
-proposal -> specs --> tasks -> apply -> verify -> archive
-             ^
-             |
-           design
+propose → spec → design → tasks → apply → verify → archive
 ```
 
-Pero no todo cambio recorre el ciclo entero. El orquestador elige la línea según el contexto:
+Pero no todo cambio necesita el ciclo entero. El orquestador evalúa la tabla de routing
+(`openspec/config.yaml`) de arriba a abajo y activa la **primera ruta que coincide**.
 
-| Línea | Cuándo | Recorrido |
-| --- | --- | --- |
-| **Estándar** | Repo con código existente | `/sdd-new` → `/sdd-continue` (o por fases) → `/sdd-apply` → `/sdd-verify` → `/sdd-archive` |
-| **Fast-forward** | El cambio está claro; quieres llegar a tareas rápido | `/sdd-ff` = proposal → specs → design → tasks (no implementa) |
-| **Lite** | Cambio trivial o pequeño | `/sdd-lite` = proposal-lite → tasks → apply → verify |
-| **Proyecto nuevo/vacío** | No hay producto, stack ni arquitectura | `/sdd-foundation` fija cimientos antes de `/sdd-new` o `/sdd-ff` |
-| **Baseline brownfield** | Hay código pero `openspec/specs/` está vacío | `/sdd-baseline` siembra specs de comportamiento actual por dominios (en tandas) |
-| **Continuación** | Retomar un cambio a medias | `/sdd-continue` recupera estado desde `state.yaml`, sin depender del chat |
-| **Workspace multi-repo** | Federación de varios repos | `/sdd-workspace` para atlas, estado e impacto cross-repo |
-| **Onboarding** | Aprender la metodología sobre un caso real | `/sdd-onboard` guía un ciclo completo |
+### Rutas canónicas
 
-`/sdd-apply` trabaja por tandas revisables (fusiona `apply-progress.md`); cuando el cambio supera el
+| Ruta | Clasificación | Cuándo | Fases |
+| --- | --- | --- | --- |
+| **foundation** | normal, high-risk | Proyecto vacío, sin stack ni arquitectura | `sdd-foundation` |
+| **federated** | normal, high-risk | Workspace multi-repo (`workspace-federated`) | `sdd-workspace` → propose → spec → design → tasks → apply → verify → archive |
+| **bugfix** | small, normal | El usuario indica intención explícita de bugfix | `sdd-explore` → tasks → apply → verify → archive |
+| **brownfield** | normal, high-risk | Hay código pero `openspec/specs/` está vacío | `sdd-baseline` (en tandas por dominio) |
+| **refactor** | small, normal | El usuario indica intención explícita de refactor | design → tasks → apply → verify → archive |
+| **hotfix** | trivial, small | Parche de emergencia explícito | apply → verify → archive |
+| **standard** | normal, high-risk | Proyecto activo (ruta por defecto) | propose → spec → design → tasks → apply → verify → archive |
+| **lite** | trivial, small | Cambio pequeño y de bajo riesgo | propose → tasks → apply → verify → archive |
+
+### Atajos de entrada
+
+| Comando | Qué hace |
+| --- | --- |
+| `/sdd-new` | Clasifica el cambio, selecciona la ruta y arranca la primera fase. |
+| `/sdd-ff` | Fast-forward de planificación: ejecuta propose → spec → design → tasks sin implementar. |
+| `/sdd-lite` | Inicia la ruta lite directamente. |
+| `/sdd-continue` | Recupera estado desde `state.yaml` y reanuda la siguiente fase pendiente. |
+
+### Gates
+
+Algunas rutas incluyen gates que bloquean el avance hasta que se resuelven:
+
+- **clarify** — el orquestador detecta ambigüedad y pide aclaraciones antes de continuar.
+- **4r-review-gate** — tras un `sdd-verify` exitoso, evalúa si el cambio requiere revisión humana.
+- **impact** — en rutas federadas, evalúa impacto cross-repo antes de implementar.
+- **brownfield-advisory** — informa sobre el estado de baseline antes de ejecutar.
+
+### Implementación por tandas
+
+`/sdd-apply` trabaja por tandas revisables (fusiona `apply-progress.md`). Cuando el cambio supera el
 presupuesto de ~400 líneas, el orquestador propone PRs encadenadas (`stacked-to-main` o
-`feature-branch-chain`) o exige una `size:exception` consciente. El modo **Interactive** pausa entre
-fases para revisar decisiones; el **Automatic** las encadena, pero nunca evita los gates de riesgo,
-arquitectura, testing o carga de revisión. Detalle completo en
-[docs/sdd-workflows.md](docs/sdd-workflows.md).
+`feature-branch-chain`) o exige una `size:exception` consciente.
+
+### Modos de ejecución
+
+| Modo | Comportamiento |
+| --- | --- |
+| **Interactive** (default) | Pausa entre fases para revisar decisiones. |
+| **Automatic** | Encadena fases sin pausar, pero nunca evita los gates de riesgo, arquitectura, testing o carga de revisión. |
+
+Detalle completo en [docs/sdd-workflows.md](docs/sdd-workflows.md).
 
 ## Runtime y continuidad
 

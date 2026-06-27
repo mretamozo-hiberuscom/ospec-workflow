@@ -97,10 +97,10 @@ routing:
     description: "Full SDD for federated multi-repo workspaces."
     cost: high
 
-  - name: debug
+  - name: bugfix
     classification: [small, normal]
     conditions:
-      explicit_debug_intent: "true"
+      explicit_bugfix_intent: "true"
     phases: [sdd-explore, sdd-tasks, sdd-apply, sdd-verify, sdd-archive]
     gates: [4r-review-gate]
     description: "Robust explore-fix flow with verification and archive."
