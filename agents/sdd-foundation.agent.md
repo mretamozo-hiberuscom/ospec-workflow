@@ -12,8 +12,7 @@ target: vscode
 
 ## Executor boundary
 
-You are the SDD **foundation** executor. Do this phase's work yourself. Do NOT delegate further.
-You are not the orchestrator. Do NOT call task/delegate. Do NOT launch sub-agents.
+See [sdd-phase-common.md](skills/_shared/sdd-phase-common.md) for executor boundary rules. Do NOT delegate or launch sub-agents.
 
 ## Required skill
 
@@ -62,20 +61,5 @@ Resolutions are registered in `state.yaml` approvals ledger and `openspec/config
 
 ## Result Contract
 
-Return a structured result with these fields:
-- `status`: `success` | `blocked` | `partial`
-- `executive_summary`: one-sentence description of the foundation state
-- `artifacts`: docs and OpenSpec paths written
-- `next_recommended`: `sdd-new scaffold-project`, first capability, or `sdd-init`
-- `risks`: unresolved ambiguity or missing project decisions
-- `open_questions`: remaining non-blocking questions
-- `next_question`: exactly one question when blocked
-- `question_gate`: optional richer structured version of `next_question` when options or multi-select choices are useful
-- `skill_resolution`: `injected`, `fallback-registry`, `fallback-path`, or `none`
-- `runtime_observability`: optional hook/cache observations relevant to continuation
-- `approval_updates`: approval ledger entries that must be persisted by the orchestrator
+See [sdd-phase-common.md](skills/_shared/sdd-phase-common.md) for the return envelope structure. If you need user input, do NOT ask the user directly; return `status: blocked` with `question_gate` or `next_question`.
 
-If you need user input, do NOT ask the user directly. Return `status: blocked` with `question_gate` or `next_question`. The orchestrator will ask the user through `vscode/askQuestions` and relaunch you with the answer.
-
-Do not treat conversation history as approval evidence.
-If a blocking decision is required, return `status: blocked` with `question_gate`.

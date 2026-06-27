@@ -12,8 +12,7 @@ target: vscode
 
 ## Executor boundary
 
-You are the SDD **workspace** executor. Do this phase's work yourself. Do NOT delegate further.
-You are not the orchestrator. Do NOT call task/delegate. Do NOT launch sub-agents.
+See [sdd-phase-common.md](skills/_shared/sdd-phase-common.md) for executor boundary rules. Do NOT delegate or launch sub-agents.
 
 ## Required skill
 
@@ -49,19 +48,9 @@ Parse the leading token of the user input as the subcommand: `init`, `enroll`, `
 - `impact <change>` — list the members affected by a change through the contract graph (provider plus its consumers).
 - `general-baseline` — scan member package/go manifests, analyze aligned and misaligned dependencies, and generate a unified baseline report at `docs/architecture/shared-baseline.md`.
 
-> **Stale contract graph caveat**: a provider declares its contracts and their `consumers`
-> in `provides[]`. A new consumer added WITHOUT re-enrolling its provider leaves the
-> provider's graph stale in the atlas until the next `enroll` on that provider. `explore`
-> surfaces this inconsistency in `workspace-map.md` warnings.
+> **Stale contract graph caveat**: a provider declares its contracts and their `consumers` in `provides[]`. A new consumer added WITHOUT re-enrolling its provider leaves the provider's graph stale in the atlas until the next `enroll` on that provider. `explore` surfaces this inconsistency in `workspace-map.md` warnings.
 
 ## Result Contract
 
-Return a structured result with these fields:
-- `status`: `success` | `partial` | `blocked`
-- `executive_summary`: one-sentence description of the subcommand result
-- `artifacts`: paths written this run (`openspec/workspace.yaml` for `init`; per-member `openspec/federation.member.yaml` for `enroll`; markers + `openspec/workspace.yaml` + `openspec/workspace-map.md` for `explore`; `docs/architecture/shared-baseline.md` for `general-baseline`; none for read-only `status`/`impact`)
-- `next_recommended`: `sdd-new` for a cross-repo change, `sdd-workspace status`, or re-run with answer (when `blocked`)
-- `risks`: unreachable members, atlas-parse gaps, contract-graph holes, or per-member enroll failures recorded as `pending`
-- `skill_resolution`: `injected`, `fallback-registry`, `fallback-path`, or `none`
+See [sdd-phase-common.md](skills/_shared/sdd-phase-common.md) for the return envelope structure. If you need user input, do NOT ask the user directly; return `status: blocked` with `question_gate` or `next_question`.
 
-Return `blocked` with `question_gate` for the `init` confirmation before writing the atlas. If you need user input, do NOT ask the user directly — the orchestrator owns user interaction and will relaunch you with the answer.

@@ -10,8 +10,7 @@ target: vscode
 
 ## Executor boundary
 
-You are the **review-readability** executor. Do this review yourself. Do NOT delegate further.
-You are not the orchestrator. Do NOT call task/delegate. Do NOT launch sub-agents.
+See [sdd-phase-common.md](skills/_shared/sdd-phase-common.md) for executor boundary rules. Do NOT delegate or launch sub-agents.
 
 ## Required skill
 
@@ -60,11 +59,5 @@ No additional prose, no placeholder text.
 
 ## Result Contract
 
-Return a structured result with these fields:
-- `status`: `success`
-- `executive_summary`: brief count of findings by severity, or "No findings."
-- `findings`: list of finding objects (empty list when clean)
-- `artifacts`: `[]` (reviewers never write files)
-- `next_recommended`: none (orchestrator decides routing after collecting all four envelopes)
-- `risks`: any scope limitations (files not readable, partial scan)
-- `skill_resolution`: `injected`, `fallback-registry`, `fallback-path`, or `none`
+See [sdd-phase-common.md](skills/_shared/sdd-phase-common.md) for the return envelope structure. Include `findings` (list of finding objects, empty when clean) in the detailed report or result envelope.
+
