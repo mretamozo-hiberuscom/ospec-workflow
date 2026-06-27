@@ -101,10 +101,10 @@ routing:
     classification: [small, normal]
     conditions:
       explicit_debug_intent: "true"
-    phases: [sdd-explore, sdd-apply]
+    phases: [sdd-explore, sdd-tasks, sdd-apply, sdd-verify, sdd-archive]
     gates: [4r-review-gate]
-    description: "Lightweight locate-fix flow closing with 4R review gate."
-    cost: low
+    description: "Robust explore-fix flow with verification and archive."
+    cost: medium
 
   - name: brownfield
     classification: [normal, high-risk]
@@ -117,6 +117,24 @@ routing:
     gates: [brownfield-advisory]
     description: "Advisory-first baseline pass for brownfield repos."
     cost: medium
+
+  - name: refactor
+    classification: [small, normal]
+    conditions:
+      explicit_refactor_intent: "true"
+    phases: [sdd-design, sdd-tasks, sdd-apply, sdd-verify, sdd-archive]
+    gates: [4r-review-gate]
+    description: "Behavior-preserving code refactoring with design, verification, and archiving."
+    cost: medium
+
+  - name: hotfix
+    classification: [trivial, small]
+    conditions:
+      explicit_hotfix_intent: "true"
+    phases: [sdd-apply, sdd-verify, sdd-archive]
+    gates: []
+    description: "Emergency patch or trivial change directly applied, verified, and archived."
+    cost: low
 
   - name: standard
     classification: [normal, high-risk]
@@ -131,9 +149,9 @@ routing:
     classification: [trivial, small]
     conditions:
       change.classification: small
-    phases: [sdd-propose, sdd-tasks, sdd-apply, sdd-verify]
+    phases: [sdd-propose, sdd-tasks, sdd-apply, sdd-verify, sdd-archive]
     gates: []
-    description: "Reduced SDD for trivial/small changes."
+    description: "Reduced SDD for trivial/small changes with archiving."
     cost: low
 
 # ---------------------------------------------------------------------------

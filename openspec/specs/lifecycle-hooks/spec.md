@@ -98,7 +98,7 @@ skipped. The orchestrator MUST record them as `status: skipped` in the audit blo
 
 #### Scenario: Absent-phase event is skipped
 
-- GIVEN the active route is `debug` (no `sdd-verify` phase)
+- GIVEN the active route is `foundation` (no `sdd-verify` phase)
   AND `hooks.before-verify` is declared
 - WHEN the route executes
 - THEN `before-verify` MUST NOT fire and MUST be recorded as `skipped`

@@ -179,7 +179,11 @@ After the Init Guard completes and before launching any SDD phase, select the ro
 Call `classifyChange(ctx)` where `ctx` carries the current context signals (`classification`, `project.status`, `baseline.status`, `artifact_store.backend`).
 
 - `confidence: 'deterministic'` → proceed to Step 3 without asking the user.
-- `confidence: 'advisory'` → use `vscode/askQuestions` to ask the user to clarify intent **before** committing to a route. Do NOT auto-route on advisory signals.
+- `confidence: 'advisory'` → use `vscode/askQuestions` to recommend the matching route, but offer the options to:
+  - "Apply recommended route" (locks session into recommended route)
+  - "Choose another declared route" (allows user override to another route name)
+  - "Go freeform (no restrictions)" (sets `actual_route: freeform`, disabling strict phase validation)
+  Do NOT auto-route on advisory signals without this confirmation.
 
 #### Step 3: Evaluate Conditions — First Match Wins
 
@@ -202,7 +206,14 @@ These fields MUST be present before the first phase of the selected route execut
 
 #### Step 5: Execute the Route
 
-Run the route's `phases` in declared order. Run each `gate` at its defined hook point:
+Run the route's `phases` in declared order.
+
+Before delegating any phase `PHASE_NAME` to a subagent:
+1. Run the command: `node scripts/configure/validate-phase.js PHASE_NAME ACTUAL_ROUTE_NAME CHANGE_NAME` (where `ACTUAL_ROUTE_NAME` is the route resolved in `state.yaml` and `CHANGE_NAME` is the active change).
+2. If this command exits with exit code 1 (or outputs an error), you MUST halt execution, print the error message back to the user, and do NOT dispatch the subagent.
+3. If this command exits with exit code 0, proceed to launch the subagent.
+
+Run each `gate` at its defined hook point:
 
 | Gate | Hook point |
 |------|-----------|
@@ -210,7 +221,7 @@ Run the route's `phases` in declared order. Run each `gate` at its defined hook 
 | `brownfield-advisory` | Before any phase (brownfield route, first gate) |
 | `clarify` | After `sdd-spec`, before `sdd-design` |
 | `review-workload` | After `sdd-tasks` |
-| `4r-review-gate` | After `sdd-apply` (debug route); after successful `sdd-verify` (standard route) |
+| `4r-review-gate` | After successful `sdd-verify` returns `success` |
 
 #### Graceful Degradation (routing: absent or empty)
 
@@ -231,7 +242,7 @@ here.
 | Handler | Trigger condition | `_shared/` file | Read at (hook point) |
 |---|---|---|---|
 | Brownfield Route Handler | route classification == `brownfield` | `skills/_shared/route-brownfield.md` | At route dispatch, before the first brownfield phase (brownfield-advisory gate) |
-| 4R Review Gate Dispatch | `4r-review-gate` listed in the active route `gates` | `skills/_shared/gate-4r-review.md` | When the 4R hook point is reached (after `sdd-apply` on debug; after `sdd-verify` success on standard) |
+| 4R Review Gate Dispatch | `4r-review-gate` listed in the active route `gates` | `skills/_shared/gate-4r-review.md` | When the 4R hook point is reached (after successful `sdd-verify` returns `success`) |
 | Workspace Federation / Federation Baseline Loop | `artifact_store.backend == workspace-federated` | `skills/_shared/route-federation.md` | At route start when the backend is federated, before federated foundation / baseline loop |
 | Lifecycle Hook Dispatch | `hooks:` present and non-empty in `config.yaml` | `skills/_shared/dispatch-lifecycle-hooks.md` | At route start (setup/cache), before the first phase dispatch |
 | Archive Dispatch Guard (Quality Gates) | before dispatching `sdd-archive` | `skills/_shared/gate-archive-quality.md` | At the archive guard, before dispatching `sdd-archive` |

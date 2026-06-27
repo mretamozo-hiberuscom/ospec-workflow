@@ -256,8 +256,7 @@ Then the orchestrator MUST surface it to the user via `vscode/askQuestions` befo
 
 | Route | Gate hook point |
 |-------|----------------|
-| `debug` | After `sdd-apply` completes; `sdd-verify` is skipped on this route |
-| `standard` | After `sdd-verify` returns `status: success` (only when `gates` lists `4r-review-gate`) |
+| `bugfix`, `refactor`, `standard` | After `sdd-verify` returns `status: success` (only when `gates` lists `4r-review-gate`) |
 
 ---
 

@@ -106,22 +106,28 @@ The `routing:` block in `openspec/config.yaml` declares the ordered list of rout
 |---|------|---------------|---------------|--------|-------|------|
 | 1 | `foundation` | `[normal, high-risk]` | `project.status: empty` | `[sdd-foundation]` | `[]` | medium |
 | 2 | `federated` | `[normal, high-risk]` | `artifact_store.backend: workspace-federated` | `[sdd-workspace, sdd-propose, sdd-spec, sdd-design, sdd-tasks, sdd-apply, sdd-verify, sdd-archive]` | `[impact, clarify]` | high |
-| 3 | `debug` | `[small, normal]` | `explicit_debug_intent: "true"` | `[sdd-explore, sdd-apply]` | `[4r-review-gate]` | low |
+| 3 | `bugfix` | `[small, normal]` | `explicit_bugfix_intent: "true"` | `[sdd-explore, sdd-tasks, sdd-apply, sdd-verify, sdd-archive]` | `[4r-review-gate]` | medium |
 | 4 | `brownfield` | `[normal, high-risk]` | `baseline.status: pending` | `[sdd-baseline]` | `[brownfield-advisory]` | medium |
-| 5 | `standard` | `[normal, high-risk]` | `project.status: active` | `[sdd-propose, sdd-spec, sdd-design, sdd-tasks, sdd-apply, sdd-verify, sdd-archive]` | `[clarify, 4r-review-gate]` | high |
-| 6 | `lite` | `[trivial, small]` | `change.classification: small` | `[sdd-propose, sdd-tasks, sdd-apply, sdd-verify]` | `[]` | low |
+| 5 | `refactor` | `[small, normal]` | `explicit_refactor_intent: "true"` | `[sdd-design, sdd-tasks, sdd-apply, sdd-verify, sdd-archive]` | `[4r-review-gate]` | medium |
+| 6 | `hotfix` | `[trivial, small]` | `explicit_hotfix_intent: "true"` | `[sdd-apply, sdd-verify, sdd-archive]` | `[]` | low |
+| 7 | `standard` | `[normal, high-risk]` | `project.status: active` | `[sdd-propose, sdd-spec, sdd-design, sdd-tasks, sdd-apply, sdd-verify, sdd-archive]` | `[clarify, 4r-review-gate]` | high |
+| 8 | `lite` | `[trivial, small]` | `change.classification: small` | `[sdd-propose, sdd-tasks, sdd-apply, sdd-verify, sdd-archive]` | `[]` | low |
 
 ### 4.2 Route-Specific Behaviors
 
 **foundation**: Stops after `sdd-foundation` completes. MUST NOT auto-chain into the standard SDD flow.
 
-**debug**: Is explicit-only. The user MUST signal debug intent (e.g., "debug this", "add logs", "quick fix"). The orchestrator MUST NOT auto-route to `debug` from classification signals alone.
+**bugfix**: Is explicit-only. The user MUST signal bugfix intent (e.g., "fix bug", "bugfix", "quick fix"). The orchestrator MUST NOT auto-route to `bugfix` from classification signals alone.
 
 **brownfield**: The `brownfield-advisory` gate runs first. `sdd-baseline` runs only on user consent. The route then re-routes to the underlying change route.
 
+**refactor**: Is explicit-only. The user MUST signal refactor intent. It skips propose/spec phases, preserving existing functional behavior.
+
+**hotfix**: Is explicit-only. Used for emergency patches. Applies fixes directly without planning overhead, but forces verification and archival.
+
 **standard**: Lists `4r-review-gate` in `gates` to enable optional 4R review after a successful `sdd-verify`. Removing it from the list disables 4R for this route.
 
-**lite**: Omits the `clarify` gate. That gate is skipped when `route=lite` AND `class` is in `{trivial, small}` AND there is no `residual_ambiguity` from `sdd-spec`.
+**lite**: Omits the `clarify` gate. That gate is skipped when `route=lite` AND `class` is in `{trivial, small}` AND there is no `residual_ambiguity` from `sdd-spec`. Runs archival at the end.
 
 ### 4.3 Route Entry Schema
 
@@ -537,8 +543,7 @@ Gates are not evaluated during route selection; they are attached to specific ex
 
 | Route | Hook point |
 |-------|-----------|
-| `debug` | After `sdd-apply` completes |
-| `standard` | After `sdd-verify` returns `success` |
+| `bugfix`, `refactor`, `standard` | After `sdd-verify` returns `success` |
 
 ### 10.3 4R Gate Policy
 
@@ -752,7 +757,7 @@ actions complete.
 
 ### Scenario: Skipped events are recorded
 
-- GIVEN the active route is `debug` (no `sdd-verify`) and `hooks.before-verify` is declared
+- GIVEN the active route is `foundation` (no `sdd-verify` phase) and `hooks.before-verify` is declared
 - WHEN the route completes
 - THEN `state.yaml` MUST contain `lifecycle_hooks.before-verify.status: skipped`
 

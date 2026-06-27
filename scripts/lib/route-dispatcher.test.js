@@ -46,14 +46,14 @@ const FEDERATED_ROUTE = {
   description: "Full SDD for federated multi-repo workspaces.",
 };
 
-const DEBUG_ROUTE = {
-  name: "debug",
+const BUGFIX_ROUTE = {
+  name: "bugfix",
   classification: ["small", "normal"],
-  conditions: { explicit_debug_intent: "true" },
-  phases: ["sdd-explore", "sdd-apply"],
+  conditions: { explicit_bugfix_intent: "true" },
+  phases: ["sdd-explore", "sdd-tasks", "sdd-apply", "sdd-verify", "sdd-archive"],
   gates: ["4r-review-gate"],
-  description: "Lightweight locate-fix flow closing with 4R review gate.",
-  cost: "low",
+  description: "Robust explore-fix flow with verification and archive.",
+  cost: "medium",
 };
 
 const BROWNFIELD_ROUTE = {
@@ -167,8 +167,8 @@ test("validateRoute accepts the federated route", () => {
   assert.deepEqual(result.errors, []);
 });
 
-test("validateRoute accepts the debug route", () => {
-  const result = validateRoute(DEBUG_ROUTE);
+test("validateRoute accepts the bugfix route", () => {
+  const result = validateRoute(BUGFIX_ROUTE);
 
   assert.equal(result.valid, true);
   assert.deepEqual(result.errors, []);
@@ -948,13 +948,13 @@ test("parseRoutingTable parses match:any as string 'any' (not boolean)", () => {
 test("parseRoutingTable coerces top-level experimental:true string to boolean true", () => {
   const content = [
     "routing:",
-    "  - name: debug",
+    "  - name: bugfix",
     "    classification: small",
     "    conditions:",
-    "      explicit_debug_intent: true",
-    "    phases: [sdd-explore, sdd-apply]",
+    "      explicit_bugfix_intent: true",
+    "    phases: [sdd-explore, sdd-tasks, sdd-apply, sdd-verify, sdd-archive]",
     "    gates: []",
-    "    description: Debug.",
+    "    description: Bugfix.",
     "    experimental: true",
   ].join("\n");
 
