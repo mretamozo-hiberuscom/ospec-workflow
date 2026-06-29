@@ -38,6 +38,20 @@ En ambos casos:
 4. Continúa el flujo con `/sdd-continue` o ejecútalo por fases.
 5. Verifica con `/sdd-verify` y archiva con `/sdd-archive`.
 
+### Instrucciones del proyecto (recomendado)
+
+El plugin rinde mejor cuando el agente sabe **coordinar en vez de ejecutar**: un solo
+hilo de conversación que delega en el orquestador SDD y sus agentes de fase. Para fijar
+ese contrato, este repo incluye dos plantillas listas para copiar a la raíz de tu
+proyecto:
+
+- [`CLAUDE.md`](CLAUDE.md) — para **Claude Code** (sintaxis de skills y `AskUserQuestion`).
+- [`AGENT.md`](AGENT.md) — variante **agnóstica** para GitHub Copilot CLI, opencode u
+  otros agentes (renómbralo a `AGENTS.md` si tu harness usa ese nombre).
+
+Copia el archivo correspondiente y fusiónalo con tus instrucciones existentes. Sin él el
+flujo igual funciona, pero el agente tiende a implementar a mano en lugar de delegar.
+
 ### Claude Code
 
 #### Para usuarios finales (sin clonar el repo ni Node)
@@ -156,6 +170,7 @@ Consulta la [guía de instalación](docs/plugin-installation.md) para instalaci�
 
 | Ruta | Propósito |
 | --- | --- |
+| `CLAUDE.md` / `AGENT.md` | Plantillas de instrucciones de proyecto (Claude Code y agnóstica) que fijan el contrato coordinador-no-ejecutor. Copialas a tu repo. |
 | `.plugin.json` | Manifiesto **canónico** (VS Code/direct-load). Editá este primero. |
 | `.claude-plugin/plugin.json` | Copia de compatibilidad para la distribución Claude; también es la fuente que lee el generador (`scripts/configure/cli.js`). Debe reflejar el canónico — `scripts/manifest-sync.test.js` lo verifica en CI. |
 | `agents/` | Orquestador y agentes especializados por fase. |
