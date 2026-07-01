@@ -4,13 +4,14 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { execFileSync } = require("node:child_process");
 const {
   calculateFingerprint,
   discoverSkills,
   readRegistryCache,
   writeRegistryCache,
 } = require("../lib/skill-registry.js");
-const { readBaselineState } = require("../lib/ospec-state.js");
+const { readBaselineState, detectSpecDrift } = require("../lib/ospec-state.js");
 const {
   parseCapabilities,
   capabilityNames,
@@ -47,6 +48,24 @@ function buildBaselineHint(baselineState) {
   }
 
   return null;
+}
+
+// Builds a workspace-scoped git runner so git commands run in the detected
+// workspace directory instead of the process cwd (relevant when the test
+// fixture is a temp dir). Accepts the per-call `timeoutMs` passed by
+// resolveGitState/detectSpecDrift, which enforce a single shared 5 s deadline
+// across their probes (mirrors Go's context.WithTimeout approach in
+// gitstate.go). Shared by the git-collaboration advisory and the spec-drift
+// advisory — both hook paths need the same "run git in `workspace`" runner.
+function createWorkspaceGitRunner(workspace) {
+  return function workspaceGitRunner(args, timeoutMs) {
+    return execFileSync("git", args, {
+      timeout: typeof timeoutMs === "number" && timeoutMs > 0 ? timeoutMs : 5000,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      cwd: workspace,
+    });
+  };
 }
 
 function resolveWorkspace(input, fallbackCwd) {
@@ -165,22 +184,8 @@ async function runSessionStart({
   // Omitted entirely when the bypass env var is set or when both conditions
   // are absent (clean feature branch).
   if (process.env.DISABLE_GIT_COLLABORATION_GUARD !== "true") {
-    // Use the injected runner (for tests) or build a workspace-scoped default
-    // runner so git commands run in the detected workspace directory instead of
-    // the process cwd (relevant when the test fixture is a temp dir).
-    //
-    // The workspace runner accepts the per-call `timeoutMs` passed by
-    // resolveGitState, which enforces a single shared 5 s deadline across all
-    // three probes (mirrors Go's context.WithTimeout approach in gitstate.go).
-    const { execFileSync } = require("node:child_process");
-    const resolvedGitRunner = gitRunner || function workspaceGitRunner(args, timeoutMs) {
-      return execFileSync("git", args, {
-        timeout: typeof timeoutMs === "number" && timeoutMs > 0 ? timeoutMs : 5000,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-        cwd: workspace,
-      });
-    };
+    // Use the injected runner (for tests) or the shared workspace-scoped default.
+    const resolvedGitRunner = gitRunner || createWorkspaceGitRunner(workspace);
     const gitState = resolveGitState(resolvedGitRunner);
     const onDefault =
       gitState.defaultBranch !== null &&
@@ -204,6 +209,37 @@ async function runSessionStart({
       result.systemMessage = result.systemMessage
         ? result.systemMessage + "\n" + advisory
         : advisory;
+    }
+  }
+
+  // Spec drift advisory — additive, after the git-collaboration block.
+  // Independently gated by DISABLE_SPEC_DRIFT_GUARD (single kill switch for
+  // both this SessionStart summary and PreToolUse's Step 5c, same precedent
+  // as DISABLE_GIT_COLLABORATION_GUARD covering two hook paths). Wrapped so a
+  // manifest/git failure can never break session start.
+  if (process.env.DISABLE_SPEC_DRIFT_GUARD !== "true") {
+    try {
+      const driftRunner = gitRunner || createWorkspaceGitRunner(workspace);
+      const drift = detectSpecDrift({ workspace, gitRunner: driftRunner });
+
+      if (drift) {
+        result.specDrift = {
+          status: "warning",
+          domains: drift.domains.map((d) => ({
+            domain: d.domain,
+            sinceCommit: d.sinceCommit,
+            message: `El dominio '${d.domain}' ha derivado desde ${d.sinceCommit}. Considera ejecutar /sdd-reconcile ${d.domain}.`,
+          })),
+        };
+
+        const names = drift.domains.map((d) => d.domain).join(", ");
+        const line = `Deriva de especificación en: ${names}. Considera ejecutar /sdd-reconcile.`;
+        result.systemMessage = result.systemMessage
+          ? result.systemMessage + "\n" + line
+          : line;
+      }
+    } catch {
+      // Drift detection must never break session start.
     }
   }
 

@@ -1,0 +1,105 @@
+change:
+  name: sdd-context-awareness-reconciliation
+  status: archived
+
+last_updated: 2026-07-02T23:59:59Z
+blocking_questions: []
+
+route:
+  intended_route: standard
+  actual_route: standard
+  route_rationale: "project.status: active matched the 'standard' route condition; no federated/brownfield/bugfix/refactor/hotfix/foundation signals present."
+  validated: true
+  validation_errors: []
+
+execution_mode: interactive
+delivery_strategy: exception-ok
+
+approvals:
+  - id: execution-mode-001
+    gate: execution-mode
+    decision: interactive
+    source: AskUserQuestion
+    accepted_at: "2026-07-01T00:00:00Z"
+    applies_to:
+      - sdd-propose
+      - sdd-spec
+      - sdd-design
+      - sdd-tasks
+      - sdd-apply
+      - sdd-verify
+      - sdd-archive
+  - id: delivery-strategy-001
+    gate: delivery-strategy
+    decision: exception-ok
+    source: AskUserQuestion
+    accepted_at: "2026-07-01T00:00:00Z"
+    applies_to:
+      - sdd-tasks
+      - sdd-apply
+  - id: non-trivial-threshold-001
+    gate: clarify
+    decision: hybrid-file-count-or-new-logic
+    source: AskUserQuestion
+    accepted_at: "2026-07-01T00:30:00Z"
+    applies_to:
+      - sdd-design
+      - sdd-apply
+  - id: reconcile-agent-file-001
+    gate: design-open-question
+    decision: "agents/sdd-reconcile.agent.md is required (full triplet: command+skill+agent), matching all 13 existing SDD phases with zero exceptions; verified against skills/sdd-baseline/SKILL.md's delegate_only stop-sign convention"
+    source: orchestrator-inline-verification
+    accepted_at: "2026-07-01T01:15:00Z"
+    applies_to:
+      - sdd-tasks
+      - sdd-apply
+  - id: verify-warning-1-resolved-001
+    gate: pre-archive-quality
+    decision: "WARNING-1 [spec-gap] fixed, not just accepted: specs/spec-reconciliation/spec.md's 'Skill discoverable at session start' scenario was factually wrong (discoverSkills deliberately excludes all sdd-* dirs) — reworded to two accurate scenarios (orchestrator allowlist dispatch + correct exclusion from the registry cache). The false 'new skill confirmed indexed' claim was corrected in apply-progress.md (Batch 5) and this file's phases.apply.notes."
+    source: orchestrator-inline-fix
+    accepted_at: "2026-07-02T00:30:00Z"
+    applies_to:
+      - sdd-archive
+  - id: verify-warning-2-accepted-001
+    gate: pre-archive-quality
+    decision: "WARNING-2 [design-gap] accepted as-is, no follow-up required: agents/spec-reconciliation MUST scenarios rest on inspection-proof only (no doc-assertion runtime tests), matching design.md's Testing Strategy which deliberately scoped this phase to generation/validation via scripts/check.js rather than unit tests. sdd-verify confirmed this is a lower-tier, intentional trade-off, not a code-bug."
+    source: AskUserQuestion
+    accepted_at: "2026-07-02T00:30:00Z"
+    applies_to:
+      - sdd-archive
+
+phases:
+  propose:
+    status: done
+    artifact: "openspec/changes/sdd-context-awareness-reconciliation/proposal.md"
+  spec:
+    status: done
+    artifacts:
+      - "openspec/changes/sdd-context-awareness-reconciliation/specs/hooks/spec.md"
+      - "openspec/changes/sdd-context-awareness-reconciliation/specs/agents/spec.md"
+      - "openspec/changes/sdd-context-awareness-reconciliation/specs/spec-reconciliation/spec.md"
+  clarify:
+    status: done
+    questions_asked: 1
+    artifacts:
+      - "openspec/changes/sdd-context-awareness-reconciliation/specs/hooks/spec.md"
+      - "openspec/changes/sdd-context-awareness-reconciliation/specs/agents/spec.md"
+  design:
+    status: done
+    artifact: "openspec/changes/sdd-context-awareness-reconciliation/design.md"
+  tasks:
+    status: done
+    artifact: "openspec/changes/sdd-context-awareness-reconciliation/tasks.md"
+  apply:
+    status: done
+    artifact: "openspec/changes/sdd-context-awareness-reconciliation/apply-progress.md"
+    notes: "Phase 1 (Drift Detection Primitives, tasks 1.1-1.6) complete and verified locally (36/36 unit tests, full repo npm test 762/762). Phase 2 (SessionStart Integration, tasks 2.1-2.4) complete and verified locally (33/33 unit tests in session-start.test.js, full repo npm test 768/768). Phase 3 (PreToolUse Integration, tasks 3.1-3.4) complete and verified locally (41/41 unit tests in pre-tool-use.test.js, full repo npm test 776/776). Phase 4 (Orchestrator Prose + Frontmatter, tasks 4.1-4.3) complete: added 'sdd-reconcile' to the agents allowlist and inserted the Ambient SDD Awareness Gate subsection in agents/sdd-orchestrator.agent.md; verified via full repo npm test 776/776 (prose-only, no dedicated unit-test layer). Phase 5 (/sdd-reconcile triplet, tasks 5.1-5.4) complete: created commands/sdd-reconcile.prompt.md, skills/sdd-reconcile/SKILL.md, and agents/sdd-reconcile.agent.md (the executor implementing the design's 6-step reconcile algorithm); verified via full repo npm test 776/776 (prose/new-files-only phase, verification is generation/validation via scripts/check.js — all 4 dist targets regenerated cleanly). CORRECTION (post-verify): the new skill is NOT indexed by discoverSkills — shouldIncludeSkill (scripts/lib/skill-registry.js:188) deliberately excludes every sdd-* skill directory from the registry cache, same as sdd-baseline and every other SDD phase skill; discoverability runs through the orchestrator's agents allowlist + command routing instead, not discoverSkills. The original "new skill confirmed indexed" claim in this note was false; corrected here and in the spec-reconciliation spec per sdd-verify WARNING-1. Phase 6 (Verification Pass, tasks 6.1-6.3) complete: cross-checked every MUST scenario in all three delta specs against the 8 modified/created source files (all match, no gaps found); confirmed DISABLE_SPEC_DRIFT_GUARD=true fully neutralizes both hook paths via existing per-hook unit tests plus a fresh combined end-to-end script run (0 git probes across both hooks, no specDrift key at all via hasOwnProperty, allow decision, against a genuinely drifted fixture domain) and confirmed both fire correctly with the guard unset; ran full npm test one final time: 776/776 tests pass, 0 fail, 0 errors, 0 warnings, all 4 dist targets regenerate cleanly. All 24/24 tasks in tasks.md are now checked. Apply is fully complete; handing off to sdd-verify."
+  verify:
+    status: done
+    artifact: "openspec/changes/sdd-context-awareness-reconciliation/verify-report.md"
+    verdict: "PASS WITH WARNINGS"
+    notes: "Independent re-run: 776/776 tests pass (node --test scripts/**/*.test.js), scripts/check.js exit 0. All 13 hooks MUST scenarios proven at runtime with non-trivial assertions. Risk areas 1-5 audited and confirmed. Two WARNINGs (non-blocking): (1) spec-gap — the 'skill discoverable via discoverSkills' scenario is unsatisfiable because shouldIncludeSkill (skill-registry.js:188) excludes all sdd-* dirs, so neither sdd-reconcile nor its mirror sdd-baseline is indexed; the skill is nonetheless registered/built identically to every sibling phase skill and routing works via the orchestrator agents allowlist — apply-progress/state falsely claimed 'skill confirmed indexed'. (2) design-gap — Phase 4/5 MUST scenarios (orchestrator gate + reconcile executor) rest on inspection-proof only; no doc-assertion runtime tests added despite repo precedent, though the design scoped these to generation/validation."
+  archive:
+    status: done
+    artifact: "openspec/changes/sdd-context-awareness-reconciliation/archive-report.md"
+    notes: "Archive complete: all 24 implementation tasks verified, specs synced additively to baseline (hooks, agents) and new spec-reconciliation created, no destructive deltas found, folder ready for move to openspec/changes/archive/2026-07-02-sdd-context-awareness-reconciliation/"

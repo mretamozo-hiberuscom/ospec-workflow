@@ -2,7 +2,9 @@
 
 const crypto = require("node:crypto");
 const fs = require("node:fs/promises");
+const fsSync = require("node:fs");
 const path = require("node:path");
+const { execFileSync } = require("node:child_process");
 const {
   ARTIFACT_STORE_MODES,
   DEFAULT_ARTIFACT_STORE_MODE,
@@ -415,13 +417,322 @@ async function appendRuntimeEvent(event) {
   };
 }
 
+/**
+ * detectSpecDrift / readStagedFiles / matchesGlobs — domain-drift primitives.
+ *
+ * detectSpecDrift mirrors resolveGitState (scripts/hooks/lib/git-state.js):
+ * synchronous, fail-safe per probe (a git failure skips that domain instead of
+ * throwing), and bounded by one shared deadline split across all per-domain
+ * probes. Both SessionStart and PreToolUse call it additively — PreToolUse
+ * also calls readStagedFiles to intersect the drifted domains against staged
+ * files, since hooks are stateless per-invocation processes.
+ */
+
+const DRIFT_TIMEOUT_MS = 5000;
+const DOMAIN_MAP_BULLET_RE = /^-\s*([\w-]+):\s*(.*)$/;
+const DOMAIN_MAP_SOURCES_RE = /\|\s*sources:\s*(.+)$/;
+const ENTRIES_HEADING_RE = /entries/i;
+
+/** Escapes one character for literal inclusion in a RegExp source string. */
+function escapeGlobLiteral(char) {
+  return /[.+^${}()|[\]\\]/.test(char) ? `\\${char}` : char;
+}
+
+/**
+ * Converts one glob pattern into an anchored RegExp.
+ * `**` -> any run of characters, including path separators (any depth).
+ * `*`  -> any run of characters EXCLUDING path separators (one segment).
+ * Everything else is matched literally.
+ */
+function globToRegExp(glob) {
+  const normalized = String(glob).replace(/\\/g, "/").trim();
+  let pattern = "";
+
+  for (let i = 0; i < normalized.length; i += 1) {
+    const char = normalized[i];
+
+    if (char === "*" && normalized[i + 1] === "*") {
+      pattern += ".*";
+      i += 1;
+    } else if (char === "*") {
+      pattern += "[^/]*";
+    } else {
+      pattern += escapeGlobLiteral(char);
+    }
+  }
+
+  return new RegExp(`^${pattern}$`);
+}
+
+/**
+ * @param {string} file - a repo-relative path (as returned by `git diff --name-only`)
+ * @param {string[]} globs
+ * @returns {boolean} true when `file` matches at least one glob
+ */
+function matchesGlobs(file, globs) {
+  if (!Array.isArray(globs) || globs.length === 0) {
+    return false;
+  }
+
+  const normalizedFile = String(file).replace(/\\/g, "/");
+
+  return globs.some((glob) => globToRegExp(glob).test(normalizedFile));
+}
+
+/**
+ * Parses `openspec/specs/_baseline/manifest.md` into its two lookups:
+ *   sources: domain -> string[] (from the Domain Map's `sources:` bullets)
+ *   entries: domain -> { status, batch, commit, timestamp } (latest row wins,
+ *            since the Entries table is an append-only log — later physical
+ *            rows for the same domain overwrite earlier ones as we scan top
+ *            to bottom)
+ *
+ * @param {string} content
+ * @returns {{ sources: Map<string, string[]>, entries: Map<string, {status:string, batch:string, commit:string, timestamp:string}> }}
+ */
+function parseManifest(content) {
+  const sources = new Map();
+  const entries = new Map();
+  let inEntriesSection = false;
+
+  for (const raw of String(content).split(/\r?\n/)) {
+    const trimmed = raw.trim();
+
+    if (!trimmed) {
+      continue;
+    }
+
+    if (trimmed.startsWith("#")) {
+      inEntriesSection = ENTRIES_HEADING_RE.test(trimmed);
+      continue;
+    }
+
+    if (!inEntriesSection) {
+      const bulletMatch = trimmed.match(DOMAIN_MAP_BULLET_RE);
+      const sourcesMatch = bulletMatch && bulletMatch[2].match(DOMAIN_MAP_SOURCES_RE);
+
+      if (sourcesMatch) {
+        sources.set(
+          bulletMatch[1],
+          sourcesMatch[1]
+            .split(",")
+            .map((glob) => glob.trim())
+            .filter(Boolean),
+        );
+      }
+
+      continue;
+    }
+
+    if (!trimmed.startsWith("|")) {
+      continue;
+    }
+
+    const cells = trimmed.split("|").slice(1, -1).map((cell) => cell.trim());
+
+    if (cells.length !== 5) {
+      continue;
+    }
+
+    const [domain, status, batch, commit, timestamp] = cells;
+
+    if (domain.toLowerCase() === "domain" || /^-+$/.test(domain)) {
+      continue; // header row or markdown separator row
+    }
+
+    entries.set(domain, { status, batch, commit, timestamp });
+  }
+
+  return { sources, entries };
+}
+
+/**
+ * Lists the baseline domain names already covered by an active (non-terminal)
+ * OpenSpec change's declared `specs/{domain}/` scope. Sync fs, fail-open to an
+ * empty set on any read error (missing `changes/`, unreadable state.yaml, ...).
+ *
+ * @param {string} openspecRoot
+ * @returns {Set<string>}
+ */
+function findSuppressedDomainsSync(openspecRoot) {
+  const suppressed = new Set();
+  const changesRoot = path.join(openspecRoot, "changes");
+  let entries;
+
+  try {
+    entries = fsSync.readdirSync(changesRoot, { withFileTypes: true });
+  } catch (_e) {
+    return suppressed;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name === "archive") {
+      continue;
+    }
+
+    const changeDir = path.join(changesRoot, entry.name);
+    let stateContent;
+
+    try {
+      stateContent = fsSync.readFileSync(path.join(changeDir, "state.yaml"), "utf8");
+    } catch (_e) {
+      continue;
+    }
+
+    if (TERMINAL_STATUSES.has(readStatus(stateContent).toLowerCase())) {
+      continue;
+    }
+
+    let specEntries;
+
+    try {
+      specEntries = fsSync.readdirSync(path.join(changeDir, "specs"), { withFileTypes: true });
+    } catch (_e) {
+      continue;
+    }
+
+    for (const specEntry of specEntries) {
+      if (specEntry.isDirectory()) {
+        suppressed.add(specEntry.name);
+      }
+    }
+  }
+
+  return suppressed;
+}
+
+/**
+ * Default gitRunner: delegates to execFileSync("git", args, { cwd: workspace, ... }).
+ * Throws on non-zero exit, timeout, or binary not found — callers must catch.
+ */
+function defaultDriftGitRunner(workspace) {
+  return function runner(args, timeoutMs) {
+    return execFileSync("git", args, {
+      cwd: workspace,
+      timeout: typeof timeoutMs === "number" && timeoutMs > 0 ? timeoutMs : DRIFT_TIMEOUT_MS,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  };
+}
+
+function parseGitFileList(output) {
+  return String(output)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Reads the currently staged files via `git diff --name-only --cached`.
+ * Fail-safe: any git failure returns null instead of throwing, so a caller
+ * can treat it as "no staged-file data" (best-effort empty overlap).
+ *
+ * @param {function} gitRunner - (args: string[], timeoutMs?: number) => string
+ * @param {number} [timeoutMs]
+ * @returns {string[]|null}
+ */
+function readStagedFiles(gitRunner, timeoutMs) {
+  const runner = typeof gitRunner === "function" ? gitRunner : defaultDriftGitRunner(process.cwd());
+
+  try {
+    return parseGitFileList(runner(["diff", "--name-only", "--cached"], timeoutMs));
+  } catch (_e) {
+    return null;
+  }
+}
+
+/**
+ * Synchronous. Never throws — git/manifest failure yields null or fewer domains.
+ *
+ * @param {object} [options]
+ * @param {string} [options.workspace]
+ * @param {function} [options.gitRunner] - (args: string[], timeoutMs?: number) => string
+ * @param {number} [options.timeoutMs]
+ * @returns {null | { status: "warning", domains: Array<{domain:string, sinceCommit:string, sources:string[], files:string[]}> }}
+ */
+function detectSpecDrift(options = {}) {
+  const { workspace = process.cwd(), gitRunner, timeoutMs = DRIFT_TIMEOUT_MS } = options;
+  const resolvedWorkspace = path.resolve(workspace);
+  const openspecRoot = path.join(resolvedWorkspace, "openspec");
+
+  let baseline;
+
+  try {
+    const configContent = fsSync.readFileSync(path.join(openspecRoot, "config.yaml"), "utf8");
+    baseline = readBaselineState(configContent);
+  } catch (_e) {
+    return null;
+  }
+
+  if (!baseline || !Array.isArray(baseline.domains_done) || baseline.domains_done.length === 0) {
+    return null;
+  }
+
+  let manifest;
+
+  try {
+    const manifestContent = fsSync.readFileSync(
+      path.join(openspecRoot, "specs", "_baseline", "manifest.md"),
+      "utf8",
+    );
+    manifest = parseManifest(manifestContent);
+  } catch (_e) {
+    return null;
+  }
+
+  const suppressed = findSuppressedDomainsSync(openspecRoot);
+  const runner = typeof gitRunner === "function" ? gitRunner : defaultDriftGitRunner(resolvedWorkspace);
+  const budget = typeof timeoutMs === "number" && timeoutMs > 0 ? timeoutMs : DRIFT_TIMEOUT_MS;
+  const deadline = Date.now() + budget;
+
+  function remaining() {
+    return Math.max(1, deadline - Date.now());
+  }
+
+  const domains = [];
+
+  for (const domain of baseline.domains_done) {
+    if (suppressed.has(domain)) {
+      continue;
+    }
+
+    const entry = manifest.entries.get(domain);
+    const domainSources = manifest.sources.get(domain);
+
+    if (!entry || !entry.commit || !Array.isArray(domainSources) || domainSources.length === 0) {
+      continue;
+    }
+
+    let changedFiles;
+
+    try {
+      const output = runner(["diff", "--name-only", `${entry.commit}..HEAD`], remaining());
+      changedFiles = parseGitFileList(output);
+    } catch (_e) {
+      continue; // fail-safe: git failure (bad hash, detached HEAD, missing binary, ...) skips this domain
+    }
+
+    const files = changedFiles.filter((file) => matchesGlobs(file, domainSources));
+
+    if (files.length > 0) {
+      domains.push({ domain, sinceCommit: entry.commit, sources: domainSources, files });
+    }
+  }
+
+  return domains.length > 0 ? { status: "warning", domains } : null;
+}
+
 module.exports = {
   RUNTIME_EVENT_RELATIVE_PATH,
   appendRuntimeEvent,
+  detectSpecDrift,
   findActiveChanges,
   findOpenSpecRoot,
+  matchesGlobs,
   readBackendMode,
   readBaselineState,
+  readStagedFiles,
   readState,
   writeSessionSummary,
 };

@@ -423,10 +423,13 @@ test("evaluateToolUse denies git commit with attribution via shell tool", () => 
 });
 
 test("evaluateToolUse allows clean git commit via shell tool", () => {
-  // Disable the git guard so this test stays focused on attribution behavior
-  // (the guard is exercised in the "git-guard" test section below).
-  const oldEnv = process.env.DISABLE_GIT_COLLABORATION_GUARD;
+  // Disable the git guard and the spec-drift guard so this test stays focused
+  // on attribution behavior (each guard is exercised in its own test section
+  // below) instead of on this process's real, uncontrolled git/drift state.
+  const oldGitGuardEnv = process.env.DISABLE_GIT_COLLABORATION_GUARD;
+  const oldDriftGuardEnv = process.env.DISABLE_SPEC_DRIFT_GUARD;
   process.env.DISABLE_GIT_COLLABORATION_GUARD = "true";
+  process.env.DISABLE_SPEC_DRIFT_GUARD = "true";
   try {
     const decision = evaluateToolUse({
       tool_name: "runTerminalCommand",
@@ -437,10 +440,15 @@ test("evaluateToolUse allows clean git commit via shell tool", () => {
 
     assert.equal(decision.permissionDecision, "allow");
   } finally {
-    if (oldEnv === undefined) {
+    if (oldGitGuardEnv === undefined) {
       delete process.env.DISABLE_GIT_COLLABORATION_GUARD;
     } else {
-      process.env.DISABLE_GIT_COLLABORATION_GUARD = oldEnv;
+      process.env.DISABLE_GIT_COLLABORATION_GUARD = oldGitGuardEnv;
+    }
+    if (oldDriftGuardEnv === undefined) {
+      delete process.env.DISABLE_SPEC_DRIFT_GUARD;
+    } else {
+      process.env.DISABLE_SPEC_DRIFT_GUARD = oldDriftGuardEnv;
     }
   }
 });
@@ -581,4 +589,261 @@ test("git-guard: git commit on default branch → ask (guard catches git-commit 
   const d = gitGuardDecision("runTerminalCommand", 'git commit -m "mensaje"', runner);
   assert.equal(d.permissionDecision, "ask", "git commit on default branch should be caught by guard");
   assert.ok(d.permissionDecisionReason.includes("rama por defecto"), "reason must mention default branch");
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3: Step 5c Spec Drift Advisory integration
+// ---------------------------------------------------------------------------
+
+const os = require("node:os");
+
+function buildManifest(domainMapLines, entryRows) {
+  return [
+    "# Baseline Manifest",
+    "",
+    "## Domain Map (batch 0 — written once, user-approved)",
+    ...domainMapLines,
+    "",
+    "## Entries (append-only log; latest row per domain wins)",
+    "| domain | status | batch | commit | timestamp (UTC) |",
+    "|---|---|---|---|---|",
+    ...entryRows,
+  ].join("\n");
+}
+
+const HOOKS_MANIFEST = buildManifest(
+  ["- hooks: Runtime hooks | sources: scripts/hooks/*.js"],
+  ["| hooks | done | 3 | 59fbfe8 | 2026-06-14T15:00:00Z |"],
+);
+
+const TWO_DOMAIN_MANIFEST = buildManifest(
+  [
+    "- hooks: Runtime hooks | sources: scripts/hooks/*.js",
+    "- skills: Skill definitions | sources: skills/**/*.md",
+  ],
+  [
+    "| hooks | done | 3 | 59fbfe8 | 2026-06-14T15:00:00Z |",
+    "| skills | done | 3 | 7abc123 | 2026-06-14T15:00:00Z |",
+  ],
+);
+
+/**
+ * Creates a temp `openspec/` fixture (config.yaml + specs/_baseline/manifest.md)
+ * for detectSpecDrift's fs reads, mirroring createDriftFixture in
+ * scripts/lib/ospec-state.test.js and createFixture's manifest handling in
+ * scripts/hooks/session-start.test.js. Sync fs, since evaluateToolUse itself
+ * is synchronous.
+ */
+function createDriftFixture(t, { domainsDone = ["hooks"], manifest = HOOKS_MANIFEST } = {}) {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "ptu-drift-"));
+  t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+
+  const openspecRoot = path.join(workspace, "openspec");
+  fs.mkdirSync(path.join(openspecRoot, "specs", "_baseline"), { recursive: true });
+  fs.mkdirSync(path.join(openspecRoot, "changes"), { recursive: true });
+
+  const configLines = [
+    "baseline:",
+    "  status: done",
+    "  domains_pending: []",
+    "  domains_done:",
+    ...domainsDone.map((domain) => `    - ${domain}`),
+    "  stale_domains: []",
+    '  last_checked: "2026-06-14T19:00:00Z"',
+  ].join("\n");
+
+  fs.writeFileSync(path.join(openspecRoot, "config.yaml"), configLines);
+  fs.writeFileSync(path.join(openspecRoot, "specs", "_baseline", "manifest.md"), manifest);
+
+  return workspace;
+}
+
+/**
+ * Combines the git-collaboration probe stub (symbolic-ref/--show-current/
+ * --porcelain — Step 5b) with the drift-probe stub (`diff --name-only
+ * <hash>..HEAD`) and the staged-files probe (`diff --name-only --cached` —
+ * Step 5c) so a single injected gitRunner answers every probe either step may
+ * issue. Mirrors makeDriftSessionGitRunner in session-start.test.js and
+ * stubGitRunner in ospec-state.test.js. Defaults collab responses to a clean
+ * feature branch so Step 5b does not fire and evaluation reaches Step 5c.
+ */
+function makeDriftGuardGitRunner({ collab = {}, driftRanges = {}, staged = [] } = {}) {
+  const collabResponses = {
+    "symbolic-ref": "origin/main",
+    "--show-current": "feat/clean",
+    "--porcelain": "",
+    ...collab,
+  };
+
+  return (args) => {
+    if (args[0] === "diff" && args.includes("--cached")) {
+      if (staged instanceof Error) throw staged;
+      return staged.join("\n");
+    }
+
+    if (args[0] === "diff") {
+      const range = args[args.length - 1];
+      const response = driftRanges[range];
+      if (response === undefined) {
+        throw new Error(`no drift stub configured for range ${range}`);
+      }
+      if (response instanceof Error) throw response;
+      return response.join("\n");
+    }
+
+    for (const [key, value] of Object.entries(collabResponses)) {
+      if (args.includes(key)) {
+        if (value instanceof Error) throw value;
+        return value;
+      }
+    }
+
+    throw new Error(`Unexpected git args: ${args.join(" ")}`);
+  };
+}
+
+/** Helper that calls evaluateToolUse for a git-commit command with an injected workspace + gitRunner. */
+function driftGuardDecision(command, { gitRunner, workspace } = {}) {
+  return evaluateToolUse(
+    { tool_name: "runTerminalCommand", tool_input: { command } },
+    { gitRunner, workspace },
+  ).hookSpecificOutput;
+}
+
+// (a) staged files overlap a drifted domain → Step 5c fires ask naming the domain
+test("spec-drift-guard: staged file overlaps drifted domain → ask naming the domain", (t) => {
+  const workspace = createDriftFixture(t);
+  const gitRunner = makeDriftGuardGitRunner({
+    driftRanges: { "59fbfe8..HEAD": ["scripts/hooks/session-start.js"] },
+    staged: ["scripts/hooks/session-start.js"],
+  });
+
+  const d = driftGuardDecision('git commit -m "feat: update hook"', { gitRunner, workspace });
+
+  assert.equal(d.permissionDecision, "ask");
+  assert.match(d.permissionDecisionReason, /hooks/);
+});
+
+// (b) no overlap between staged files and drifted domains → falls through to allow
+test("spec-drift-guard: no overlap between staged files and drifted domains → no fire, falls through", (t) => {
+  const workspace = createDriftFixture(t);
+  const gitRunner = makeDriftGuardGitRunner({
+    driftRanges: { "59fbfe8..HEAD": ["scripts/hooks/session-start.js"] },
+    staged: ["README.md"],
+  });
+
+  const d = driftGuardDecision('git commit -m "docs: update readme"', { gitRunner, workspace });
+
+  assert.equal(d.permissionDecision, "allow");
+});
+
+// (c) a DENY rule matches first → deny, drift probes never invoked
+test("spec-drift-guard: DENY rule wins — drift probes never invoked", (t) => {
+  const workspace = createDriftFixture(t);
+  let invoked = false;
+  const gitRunner = () => {
+    invoked = true;
+    throw new Error("git runner should NOT be called when a DENY rule already fired");
+  };
+
+  const d = driftGuardDecision("rm -rf /", { gitRunner, workspace });
+
+  assert.equal(d.permissionDecision, "deny");
+  assert.equal(invoked, false, "drift/collab git probes must never be invoked once a DENY rule matches");
+});
+
+// (d) DISABLE_SPEC_DRIFT_GUARD=true → skipped entirely, no drift computation
+test("spec-drift-guard: DISABLE_SPEC_DRIFT_GUARD=true → skipped, no drift git probes invoked", (t) => {
+  const workspace = createDriftFixture(t);
+  let driftProbeInvoked = false;
+  const gitRunner = (args) => {
+    if (args[0] === "diff") {
+      driftProbeInvoked = true;
+      throw new Error("drift probe should NOT be invoked when DISABLE_SPEC_DRIFT_GUARD=true");
+    }
+    // Collab probes still resolve normally (Step 5b is a separate guard).
+    if (args.includes("symbolic-ref")) return "origin/main";
+    if (args.includes("--show-current")) return "feat/clean";
+    if (args.includes("--porcelain")) return "";
+    throw new Error(`Unexpected git args: ${args.join(" ")}`);
+  };
+
+  const oldEnv = process.env.DISABLE_SPEC_DRIFT_GUARD;
+  process.env.DISABLE_SPEC_DRIFT_GUARD = "true";
+  try {
+    const d = driftGuardDecision('git commit -m "feat: update hook"', { gitRunner, workspace });
+    assert.equal(d.permissionDecision, "allow");
+    assert.equal(driftProbeInvoked, false, "drift git probe must not be invoked when the guard is disabled");
+  } finally {
+    if (oldEnv === undefined) delete process.env.DISABLE_SPEC_DRIFT_GUARD;
+    else process.env.DISABLE_SPEC_DRIFT_GUARD = oldEnv;
+  }
+});
+
+// (e) readStagedFiles resolution fails → best-effort empty array, no false fire
+test("spec-drift-guard: staged-file resolution fails → best-effort empty array, no false fire", (t) => {
+  const workspace = createDriftFixture(t);
+  const gitRunner = makeDriftGuardGitRunner({
+    driftRanges: { "59fbfe8..HEAD": ["scripts/hooks/session-start.js"] },
+    staged: new Error("fatal: not a git repository"),
+  });
+
+  const d = driftGuardDecision('git commit -m "feat: update hook"', { gitRunner, workspace });
+
+  assert.equal(d.permissionDecision, "allow");
+});
+
+// (f) Step 5b fires first → its ask wins, no double prompt, drift probe never invoked
+test("spec-drift-guard: Step 5b ask wins over Step 5c — no double prompt", (t) => {
+  const workspace = createDriftFixture(t);
+  const gitRunner = makeDriftGuardGitRunner({
+    collab: { "--show-current": "main" }, // onDefault branch → Step 5b fires first
+    // No driftRanges configured — a drift probe call would throw, proving
+    // Step 5c's detectSpecDrift is genuinely never reached.
+  });
+
+  const d = driftGuardDecision('git commit -m "feat: update hook"', { gitRunner, workspace });
+
+  assert.equal(d.permissionDecision, "ask");
+  assert.ok(d.permissionDecisionReason.includes("rama por defecto"), "Step 5b's advisory must win");
+});
+
+// (g) TRIANGULATE — two drifted domains, only one overlaps staged files → reason names only that one
+test("spec-drift-guard: two drifted domains, only one overlaps staged files → reason names only that one", (t) => {
+  const workspace = createDriftFixture(t, { domainsDone: ["hooks", "skills"], manifest: TWO_DOMAIN_MANIFEST });
+  const gitRunner = makeDriftGuardGitRunner({
+    driftRanges: {
+      "59fbfe8..HEAD": ["scripts/hooks/session-start.js"],
+      "7abc123..HEAD": ["skills/sdd-apply/SKILL.md"],
+    },
+    staged: ["scripts/hooks/session-start.js"],
+  });
+
+  const d = driftGuardDecision('git commit -m "feat: update hook"', { gitRunner, workspace });
+
+  assert.equal(d.permissionDecision, "ask");
+  assert.match(d.permissionDecisionReason, /hooks/);
+  assert.doesNotMatch(d.permissionDecisionReason, /skills/);
+});
+
+// (h) TRIANGULATE — commit command mixed with non-commit commands → 5c still evaluates only on the commit match
+test("spec-drift-guard: commit command mixed with non-commit commands → still fires on the commit match", (t) => {
+  const workspace = createDriftFixture(t);
+  const gitRunner = makeDriftGuardGitRunner({
+    driftRanges: { "59fbfe8..HEAD": ["scripts/hooks/session-start.js"] },
+    staged: ["scripts/hooks/session-start.js"],
+  });
+
+  const d = evaluateToolUse(
+    {
+      tool_name: "unknownTool",
+      tool_input: {
+        commands: ["git status --short", { command: 'git commit -m "feat: update hook"' }],
+      },
+    },
+    { gitRunner, workspace },
+  ).hookSpecificOutput;
+
+  assert.equal(d.permissionDecision, "ask");
+  assert.match(d.permissionDecisionReason, /hooks/);
 });

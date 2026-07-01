@@ -1,7 +1,23 @@
 ---
 title: Known Issues
-last_updated: 2026-06-28
+last_updated: 2026-07-02
 ---
+
+## Escenario "skill discoverable via discoverSkills" es insatisfacible: shouldIncludeSkill excluye todos los dirs sdd-*
+
+- severity: WARNING
+- area: scripts/lib/skill-registry.js:188 shouldIncludeSkill (filtro !startsWith("sdd-")) vs specs/spec-reconciliation Command and Skill Registration
+- workaround: corregir el escenario para referenciar el pipeline de generacion/validacion (scripts/check.js) en vez de discoverSkills, o eliminar la afirmacion; corregir tambien apply-progress/state que declaran falsamente "skill confirmed indexed". La skill sdd-reconcile se registra/valida identica a sdd-baseline y el routing funciona via el allowlist agents del orchestrator, no depende de discoverSkills.
+- change: sdd-context-awareness-reconciliation
+- date: 2026-07-02
+
+## Escenarios MUST de prosa (Fase 4/5: gate del orchestrator + executor reconcile) solo tienen inspection-proof, sin cobertura de runtime
+
+- severity: WARNING
+- area: agents/sdd-orchestrator.agent.md (Ambient SDD Awareness Gate) + agents/sdd-reconcile.agent.md (algoritmo 0-5)
+- workaround: agregar tests de doc-assertion ("agent.md documents X") espejando el precedente ya existente para otros agentes de fase, para elevar los 8 escenarios de agents y los 10 de spec-reconciliation de inspection-proof a runtime-test; el design los alcanzo solo a generacion/validacion, decidir en design/spec si se refuerzan.
+- change: sdd-context-awareness-reconciliation
+- date: 2026-07-02
 
 ## Go git-commit risky-trigger del git-collaboration-guard no tiene test de runtime dedicado (asimetria de paridad con Node)
 

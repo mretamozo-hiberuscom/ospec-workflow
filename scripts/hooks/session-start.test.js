@@ -13,7 +13,11 @@ const {
 
 async function createFixture(
   t,
-  { withOpenSpec = true, configContent = "strict_tdd: true\n" } = {},
+  {
+    withOpenSpec = true,
+    configContent = "strict_tdd: true\n",
+    manifestContent = null,
+  } = {},
 ) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ospec-hook-"));
   const pluginRoot = path.join(root, "plugin");
@@ -60,6 +64,16 @@ async function createFixture(
       path.join(workspace, "openspec", "config.yaml"),
       configContent,
     );
+
+    if (manifestContent !== null) {
+      await fs.mkdir(path.join(workspace, "openspec", "specs", "_baseline"), {
+        recursive: true,
+      });
+      await fs.writeFile(
+        path.join(workspace, "openspec", "specs", "_baseline", "manifest.md"),
+        manifestContent,
+      );
+    }
   }
 
   return { pluginRoot, root, workspace };
@@ -715,6 +729,186 @@ test("git-collab-session: status probe fails + on default branch → gitCollabor
   const result = await runSessionStart({ input: { cwd: workspace }, pluginRoot, gitRunner });
   assert.ok(result.gitCollaboration, "gitCollaboration must be present (default branch condition fires)");
   assert.equal(result.gitCollaboration.dirtyTree, undefined, "dirtyTree must be absent (not false) when status probe fails");
+});
+
+// ---------------------------------------------------------------------------
+// Phase 5: Spec Drift Advisory in SessionStart
+// ---------------------------------------------------------------------------
+
+function baselineDomainsDoneConfig(domains) {
+  return baselineConfig({
+    status: "done",
+    domains_pending: [],
+    domains_done: domains,
+    stale_domains: [],
+    last_checked: "2026-06-14T19:00:00Z",
+  });
+}
+
+function buildManifest(domainMapLines, entryRows) {
+  return [
+    "# Baseline Manifest",
+    "",
+    "## Domain Map (batch 0 — written once, user-approved)",
+    ...domainMapLines,
+    "",
+    "## Entries (append-only log; latest row per domain wins)",
+    "| domain | status | batch | commit | timestamp (UTC) |",
+    "|---|---|---|---|---|",
+    ...entryRows,
+  ].join("\n");
+}
+
+// Combines the git-collaboration probe stub (symbolic-ref / --show-current /
+// --porcelain) with the drift probe stub (`diff --name-only <hash>..HEAD`) so
+// a single injected gitRunner can answer both hook paths, mirroring how a
+// real `git` binary answers every probe from one process.
+function makeDriftSessionGitRunner({ collab = {}, driftRanges = {} } = {}) {
+  const collabResponses = {
+    "symbolic-ref": "origin/main",
+    "--show-current": "feat/clean",
+    "--porcelain": "",
+    ...collab,
+  };
+
+  return (args) => {
+    if (args[0] === "diff" && !args.includes("--cached")) {
+      const range = args[args.length - 1];
+      const response = driftRanges[range];
+
+      if (response === undefined) {
+        throw new Error(`no drift stub configured for range ${range}`);
+      }
+      if (response instanceof Error) throw response;
+      return response.join("\n");
+    }
+
+    for (const [key, value] of Object.entries(collabResponses)) {
+      if (args.includes(key)) {
+        if (value instanceof Error) throw value;
+        return value;
+      }
+    }
+
+    throw new Error(`Unexpected git args: ${args.join(" ")}`);
+  };
+}
+
+const HOOKS_MANIFEST = buildManifest(
+  ["- hooks: Runtime hooks | sources: scripts/hooks/*.js"],
+  ["| hooks | done | 3 | 59fbfe8 | 2026-06-14T15:00:00Z |"],
+);
+
+// (a) domain drifted → specDrift present naming the domain, systemMessage names it
+test("spec-drift-session: drifted domain → specDrift.status warning naming the domain, systemMessage mentions it", async (t) => {
+  const { pluginRoot, workspace } = await createFixture(t, {
+    configContent: baselineDomainsDoneConfig(["hooks"]),
+    manifestContent: HOOKS_MANIFEST,
+  });
+  const gitRunner = makeDriftSessionGitRunner({
+    driftRanges: { "59fbfe8..HEAD": ["scripts/hooks/session-start.js"] },
+  });
+
+  const result = await runSessionStart({ input: { cwd: workspace }, pluginRoot, gitRunner });
+
+  assert.ok(result.specDrift, "specDrift must be present");
+  assert.equal(result.specDrift.status, "warning");
+  assert.deepEqual(
+    result.specDrift.domains.map((d) => d.domain),
+    ["hooks"],
+  );
+  assert.equal(result.specDrift.domains[0].sinceCommit, "59fbfe8");
+  assert.match(result.specDrift.domains[0].message, /hooks/);
+  assert.ok(result.systemMessage && result.systemMessage.includes("hooks"), "systemMessage must name the drifted domain");
+});
+
+// (b) no domain drifted → specDrift key entirely absent
+test("spec-drift-session: no drifted domain → specDrift key absent", async (t) => {
+  const { pluginRoot, workspace } = await createFixture(t, {
+    configContent: baselineDomainsDoneConfig(["hooks"]),
+    manifestContent: HOOKS_MANIFEST,
+  });
+  const gitRunner = makeDriftSessionGitRunner({
+    driftRanges: { "59fbfe8..HEAD": ["README.md"] },
+  });
+
+  const result = await runSessionStart({ input: { cwd: workspace }, pluginRoot, gitRunner });
+
+  assert.equal(result.specDrift, undefined);
+});
+
+// (c) DISABLE_SPEC_DRIFT_GUARD=true → absent, and the drift probe is never invoked
+test("spec-drift-session: DISABLE_SPEC_DRIFT_GUARD=true → specDrift absent, no drift git probes invoked", async (t) => {
+  const { pluginRoot, workspace } = await createFixture(t, {
+    configContent: baselineDomainsDoneConfig(["hooks"]),
+    manifestContent: HOOKS_MANIFEST,
+  });
+  // No driftRanges configured — a drift probe call would throw "no drift stub
+  // configured", proving the guard genuinely skips the probe rather than the
+  // stub happening to tolerate it.
+  const gitRunner = makeDriftSessionGitRunner({});
+  const oldEnv = process.env.DISABLE_SPEC_DRIFT_GUARD;
+  process.env.DISABLE_SPEC_DRIFT_GUARD = "true";
+  try {
+    const result = await runSessionStart({ input: { cwd: workspace }, pluginRoot, gitRunner });
+    assert.equal(result.specDrift, undefined);
+  } finally {
+    if (oldEnv === undefined) delete process.env.DISABLE_SPEC_DRIFT_GUARD;
+    else process.env.DISABLE_SPEC_DRIFT_GUARD = oldEnv;
+  }
+});
+
+// (d) openspec not initialized → drift check never runs (early-return path)
+test("spec-drift-session: openspec not initialized → drift check never runs", async (t) => {
+  const { pluginRoot, workspace } = await createFixture(t, { withOpenSpec: false });
+  const gitRunner = () => {
+    throw new Error("git must never be invoked when openspec is not initialized");
+  };
+
+  const result = await runSessionStart({ input: { cwd: workspace }, pluginRoot, gitRunner });
+
+  assert.equal(result.ospecDetected, false);
+  assert.equal(result.specDrift, undefined);
+});
+
+// (e) TRIANGULATE — gitCollaboration + specDrift firing together: both lines
+// present, newline-joined, in order (git-collaboration line first).
+test("spec-drift-session: gitCollaboration and specDrift firing together → both systemMessage lines present, in order", async (t) => {
+  const { pluginRoot, workspace } = await createFixture(t, {
+    configContent: baselineDomainsDoneConfig(["hooks"]),
+    manifestContent: HOOKS_MANIFEST,
+  });
+  const gitRunner = makeDriftSessionGitRunner({
+    collab: { "--show-current": "main" }, // onDefault branch → gitCollaboration fires
+    driftRanges: { "59fbfe8..HEAD": ["scripts/hooks/session-start.js"] },
+  });
+
+  const result = await runSessionStart({ input: { cwd: workspace }, pluginRoot, gitRunner });
+
+  assert.ok(result.gitCollaboration, "gitCollaboration must be present");
+  assert.ok(result.specDrift, "specDrift must be present");
+
+  const lines = result.systemMessage.split("\n");
+  assert.equal(lines.length, 2, "systemMessage must have exactly two newline-joined lines");
+  assert.match(lines[0], /rama por defecto/, "git-collaboration line must come first");
+  assert.match(lines[1], /hooks/, "spec-drift line must come second, naming the domain");
+});
+
+// (f) TRIANGULATE — injected runner throws mid-probe → status ok still
+// returned, no specDrift key (fail-safe: never breaks session start).
+test("spec-drift-session: drift git probe throws → status ok, no specDrift key, no crash", async (t) => {
+  const { pluginRoot, workspace } = await createFixture(t, {
+    configContent: baselineDomainsDoneConfig(["hooks"]),
+    manifestContent: HOOKS_MANIFEST,
+  });
+  const gitRunner = makeDriftSessionGitRunner({
+    driftRanges: { "59fbfe8..HEAD": new Error("fatal: bad revision '59fbfe8..HEAD'") },
+  });
+
+  const result = await runSessionStart({ input: { cwd: workspace }, pluginRoot, gitRunner });
+
+  assert.equal(result.status, "ok");
+  assert.equal(result.specDrift, undefined);
 });
 
 

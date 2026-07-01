@@ -9,10 +9,13 @@ const test = require("node:test");
 const {
   RUNTIME_EVENT_RELATIVE_PATH,
   appendRuntimeEvent,
+  detectSpecDrift,
   findActiveChanges,
   findOpenSpecRoot,
+  matchesGlobs,
   readBackendMode,
   readBaselineState,
+  readStagedFiles,
   readState,
   writeSessionSummary,
 } = require("./ospec-state.js");
@@ -334,4 +337,303 @@ test("readBaselineState does not bleed into subsequent top-level blocks", () => 
   const result = readBaselineState(content);
 
   assert.equal(result.status, "done");
+});
+
+// ---------------------------------------------------------------------------
+// Domain drift primitives: matchesGlobs, readStagedFiles, detectSpecDrift
+// ---------------------------------------------------------------------------
+
+function buildManifest(domainMapLines, entryRows) {
+  return [
+    "# Baseline Manifest",
+    "",
+    "## Domain Map (batch 0 — written once, user-approved)",
+    ...domainMapLines,
+    "",
+    "## Entries (append-only log; latest row per domain wins)",
+    "| domain | status | batch | commit | timestamp (UTC) |",
+    "|---|---|---|---|---|",
+    ...entryRows,
+  ].join("\n");
+}
+
+async function createDriftFixture(t, { domainsDone = ["hooks"], manifest }) {
+  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "ospec-drift-"));
+
+  t.after(() => fs.rm(workspace, { recursive: true, force: true }));
+
+  const openspecRoot = path.join(workspace, "openspec");
+
+  await fs.mkdir(path.join(openspecRoot, "specs", "_baseline"), { recursive: true });
+  await fs.mkdir(path.join(openspecRoot, "changes"), { recursive: true });
+
+  const configLines = [
+    "baseline:",
+    "  status: done",
+    "  domains_pending: []",
+    "  domains_done:",
+    ...domainsDone.map((domain) => `    - ${domain}`),
+    "  stale_domains: []",
+    '  last_checked: "2026-06-14T19:00:00Z"',
+  ].join("\n");
+
+  await fs.writeFile(path.join(openspecRoot, "config.yaml"), configLines);
+  await fs.writeFile(path.join(openspecRoot, "specs", "_baseline", "manifest.md"), manifest);
+
+  return workspace;
+}
+
+async function createActiveChange(workspace, name, status, specDomain) {
+  const changePath = path.join(workspace, "openspec", "changes", name);
+
+  await fs.mkdir(changePath, { recursive: true });
+  await fs.writeFile(path.join(changePath, "state.yaml"), `status: ${status}\n`);
+
+  if (specDomain) {
+    await fs.mkdir(path.join(changePath, "specs", specDomain), { recursive: true });
+  }
+}
+
+// Stub gitRunner keyed on the `diff` / `--cached` args, mirroring how both
+// SessionStart and PreToolUse invoke the shared drift primitives.
+function stubGitRunner(rangeResponses = {}, stagedResponse = []) {
+  return function gitRunner(args) {
+    if (args[0] === "diff" && args.includes("--cached")) {
+      if (stagedResponse instanceof Error) {
+        throw stagedResponse;
+      }
+
+      return stagedResponse.join("\n");
+    }
+
+    if (args[0] === "diff") {
+      const range = args[args.length - 1];
+      const response = rangeResponses[range];
+
+      if (response === undefined) {
+        throw new Error(`no stub configured for range ${range}`);
+      }
+
+      if (response instanceof Error) {
+        throw response;
+      }
+
+      return response.join("\n");
+    }
+
+    throw new Error(`unexpected git args: ${args.join(" ")}`);
+  };
+}
+
+test("matchesGlobs matches ** across any directory depth", () => {
+  assert.equal(matchesGlobs("skills/sdd-apply/nested/SKILL.md", ["skills/**/*.md"]), true);
+  assert.equal(matchesGlobs("skills/SKILL.md", ["skills/**/*.md"]), false);
+});
+
+test("matchesGlobs matches * only within a single path segment", () => {
+  assert.equal(matchesGlobs("scripts/hooks/session-start.js", ["scripts/hooks/*.js"]), true);
+  assert.equal(matchesGlobs("scripts/hooks/lib/git-state.js", ["scripts/hooks/*.js"]), false);
+});
+
+test("matchesGlobs matches a literal path exactly", () => {
+  assert.equal(matchesGlobs("hooks/hooks.json", ["hooks/hooks.json"]), true);
+  assert.equal(matchesGlobs("hooks/hooks.json.bak", ["hooks/hooks.json"]), false);
+});
+
+test("matchesGlobs returns false when no glob matches", () => {
+  assert.equal(
+    matchesGlobs("scripts/other.js", ["scripts/hooks/*.js", "hooks/hooks.json"]),
+    false,
+  );
+});
+
+test("readStagedFiles parses `git diff --name-only --cached` output", () => {
+  const runner = stubGitRunner({}, ["scripts/hooks/session-start.js", "docs/readme.md"]);
+
+  assert.deepEqual(readStagedFiles(runner), [
+    "scripts/hooks/session-start.js",
+    "docs/readme.md",
+  ]);
+});
+
+test("readStagedFiles returns null on git failure without throwing", () => {
+  const runner = stubGitRunner({}, new Error("git failed"));
+
+  assert.doesNotThrow(() => readStagedFiles(runner));
+  assert.equal(readStagedFiles(runner), null);
+});
+
+test("detectSpecDrift reports a domain as drifted when changed files match its source globs", async (t) => {
+  const manifest = buildManifest(
+    ["- hooks: Runtime hooks | sources: scripts/hooks/*.js, hooks/hooks.json"],
+    ["| hooks | done | 3 | 59fbfe8 | 2026-06-14T15:00:00Z |"],
+  );
+  const workspace = await createDriftFixture(t, { domainsDone: ["hooks"], manifest });
+  const gitRunner = stubGitRunner({
+    "59fbfe8..HEAD": ["scripts/hooks/session-start.js", "README.md"],
+  });
+
+  const result = detectSpecDrift({ workspace, gitRunner });
+
+  assert.deepEqual(result, {
+    status: "warning",
+    domains: [
+      {
+        domain: "hooks",
+        sinceCommit: "59fbfe8",
+        sources: ["scripts/hooks/*.js", "hooks/hooks.json"],
+        files: ["scripts/hooks/session-start.js"],
+      },
+    ],
+  });
+});
+
+test("detectSpecDrift returns null when changed files do not overlap the domain's globs", async (t) => {
+  const manifest = buildManifest(
+    ["- hooks: Runtime hooks | sources: scripts/hooks/*.js"],
+    ["| hooks | done | 3 | 59fbfe8 | 2026-06-14T15:00:00Z |"],
+  );
+  const workspace = await createDriftFixture(t, { domainsDone: ["hooks"], manifest });
+  const gitRunner = stubGitRunner({ "59fbfe8..HEAD": ["README.md", "package.json"] });
+
+  assert.equal(detectSpecDrift({ workspace, gitRunner }), null);
+});
+
+test("detectSpecDrift suppresses a domain already covered by an active change's specs scope", async (t) => {
+  const manifest = buildManifest(
+    ["- hooks: Runtime hooks | sources: scripts/hooks/*.js"],
+    ["| hooks | done | 3 | 59fbfe8 | 2026-06-14T15:00:00Z |"],
+  );
+  const workspace = await createDriftFixture(t, { domainsDone: ["hooks"], manifest });
+
+  await createActiveChange(workspace, "in-flight-hooks-change", "active", "hooks");
+
+  const gitRunner = stubGitRunner({ "59fbfe8..HEAD": ["scripts/hooks/session-start.js"] });
+
+  assert.equal(detectSpecDrift({ workspace, gitRunner }), null);
+});
+
+test("detectSpecDrift fails safe when the git probe throws (bad hash / no git / detached HEAD)", async (t) => {
+  const manifest = buildManifest(
+    ["- hooks: Runtime hooks | sources: scripts/hooks/*.js"],
+    ["| hooks | done | 3 | 59fbfe8 | 2026-06-14T15:00:00Z |"],
+  );
+  const workspace = await createDriftFixture(t, { domainsDone: ["hooks"], manifest });
+  const gitRunner = () => {
+    throw new Error("fatal: bad revision '59fbfe8..HEAD'");
+  };
+
+  assert.doesNotThrow(() => detectSpecDrift({ workspace, gitRunner }));
+  assert.equal(detectSpecDrift({ workspace, gitRunner }), null);
+});
+
+test("detectSpecDrift derives source globs from the manifest's Domain Map sources: list", async (t) => {
+  const manifest = buildManifest(
+    [
+      "- hooks: Runtime hooks | sources: scripts/hooks/*.js, hooks/hooks.json, scripts/lib/ospec-state.js",
+    ],
+    ["| hooks | done | 3 | 59fbfe8 | 2026-06-14T15:00:00Z |"],
+  );
+  const workspace = await createDriftFixture(t, { domainsDone: ["hooks"], manifest });
+  const gitRunner = stubGitRunner({ "59fbfe8..HEAD": ["scripts/lib/ospec-state.js"] });
+
+  const result = detectSpecDrift({ workspace, gitRunner });
+
+  assert.deepEqual(result.domains[0].sources, [
+    "scripts/hooks/*.js",
+    "hooks/hooks.json",
+    "scripts/lib/ospec-state.js",
+  ]);
+});
+
+test("detectSpecDrift uses the latest Entries row per domain (append-only log, latest wins)", async (t) => {
+  const manifest = buildManifest(
+    ["- hooks: Runtime hooks | sources: scripts/hooks/*.js"],
+    [
+      "| hooks | done | 3 | 111aaaa | 2026-06-01T00:00:00Z |",
+      "| hooks | reconciled | - | 222bbbb | 2026-06-20T00:00:00Z |",
+    ],
+  );
+  const workspace = await createDriftFixture(t, { domainsDone: ["hooks"], manifest });
+  const gitRunner = stubGitRunner({ "222bbbb..HEAD": ["scripts/hooks/session-start.js"] });
+
+  const result = detectSpecDrift({ workspace, gitRunner });
+
+  assert.equal(result.domains[0].sinceCommit, "222bbbb");
+});
+
+test("detectSpecDrift returns null when zero domains drift", async (t) => {
+  const manifest = buildManifest(
+    [
+      "- hooks: Runtime hooks | sources: scripts/hooks/*.js",
+      "- routing: Routing | sources: scripts/lib/route-dispatcher.js",
+    ],
+    [
+      "| hooks | done | 3 | 59fbfe8 | 2026-06-14T15:00:00Z |",
+      "| routing | done | 2 | aaa1111 | 2026-06-14T14:00:00Z |",
+    ],
+  );
+  const workspace = await createDriftFixture(t, {
+    domainsDone: ["hooks", "routing"],
+    manifest,
+  });
+  const gitRunner = stubGitRunner({
+    "59fbfe8..HEAD": [],
+    "aaa1111..HEAD": ["README.md"],
+  });
+
+  assert.equal(detectSpecDrift({ workspace, gitRunner }), null);
+});
+
+test("detectSpecDrift reports two domains drifted simultaneously", async (t) => {
+  const manifest = buildManifest(
+    [
+      "- hooks: Runtime hooks | sources: scripts/hooks/*.js",
+      "- routing: Routing | sources: scripts/lib/route-dispatcher.js",
+    ],
+    [
+      "| hooks | done | 3 | 59fbfe8 | 2026-06-14T15:00:00Z |",
+      "| routing | done | 2 | aaa1111 | 2026-06-14T14:00:00Z |",
+    ],
+  );
+  const workspace = await createDriftFixture(t, {
+    domainsDone: ["hooks", "routing"],
+    manifest,
+  });
+  const gitRunner = stubGitRunner({
+    "59fbfe8..HEAD": ["scripts/hooks/session-start.js"],
+    "aaa1111..HEAD": ["scripts/lib/route-dispatcher.js"],
+  });
+
+  const result = detectSpecDrift({ workspace, gitRunner });
+
+  assert.deepEqual(result.domains.map((domain) => domain.domain).sort(), ["hooks", "routing"]);
+});
+
+test("detectSpecDrift tolerates irregular whitespace and a trailing comma in sources:", async (t) => {
+  const manifest = buildManifest(
+    ["- hooks: Runtime hooks | sources:   scripts/hooks/*.js ,  hooks/hooks.json ,   "],
+    ["| hooks | done | 3 | 59fbfe8 | 2026-06-14T15:00:00Z |"],
+  );
+  const workspace = await createDriftFixture(t, { domainsDone: ["hooks"], manifest });
+  const gitRunner = stubGitRunner({ "59fbfe8..HEAD": ["hooks/hooks.json"] });
+
+  const result = detectSpecDrift({ workspace, gitRunner });
+
+  assert.deepEqual(result.domains[0].sources, ["scripts/hooks/*.js", "hooks/hooks.json"]);
+});
+
+test("detectSpecDrift does not suppress an unrelated domain via a different active change's specs scope", async (t) => {
+  const manifest = buildManifest(
+    ["- hooks: Runtime hooks | sources: scripts/hooks/*.js"],
+    ["| hooks | done | 3 | 59fbfe8 | 2026-06-14T15:00:00Z |"],
+  );
+  const workspace = await createDriftFixture(t, { domainsDone: ["hooks"], manifest });
+
+  await createActiveChange(workspace, "unrelated-change", "active", "routing");
+
+  const gitRunner = stubGitRunner({ "59fbfe8..HEAD": ["scripts/hooks/session-start.js"] });
+  const result = detectSpecDrift({ workspace, gitRunner });
+
+  assert.deepEqual(result.domains.map((domain) => domain.domain), ["hooks"]);
 });

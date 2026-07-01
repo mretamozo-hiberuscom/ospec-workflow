@@ -9,6 +9,11 @@ const {
   isRiskyAction,
   composeAdvisory,
 } = require("./lib/git-state.js");
+const {
+  detectSpecDrift,
+  readStagedFiles,
+  matchesGlobs,
+} = require("../lib/ospec-state.js");
 
 /**
  * Regex that matches forbidden AI/model attribution.
@@ -16,6 +21,9 @@ const {
  */
 const FORBIDDEN_ATTRIBUTION_RE =
   /co-authored-by|generated (?:with|by)|🤖|claude|anthropic|opus|sonnet|haiku|fable|gpt|chatgpt|openai|codex|copilot|gemini|bard|llama|mistral|cohere/i;
+
+/** Matches `git commit` commands — used to scope Step 5c (spec drift advisory). */
+const GIT_COMMIT_RE = /\bgit\s+commit\b/i;
 
 const SHELL_TOOL_NAMES = new Set([
   "runcommand",
@@ -272,6 +280,7 @@ function recordTokensSync(changeName, tokens) {
 
 function evaluateToolUse(input, opts) {
   const injectedGitRunner = opts && opts.gitRunner ? opts.gitRunner : undefined;
+  const workspace = (opts && opts.workspace) || process.cwd();
 
   if (process.env.DISABLE_AGENT_SHIELD !== "true") {
     const paths = extractPaths(input?.tool_input);
@@ -417,6 +426,44 @@ function evaluateToolUse(input, opts) {
       return makeDecision("allow", "Tool did not include a command payload.");
     }
     return makeDecision("allow", "Shell tool did not include a command payload.");
+  }
+
+  // Step 5c — Spec drift advisory (always `ask`, never `deny`). Independently
+  // gated by DISABLE_SPEC_DRIFT_GUARD — the same single kill switch shared
+  // with SessionStart's specDrift block (see specs/hooks/spec.md). Hooks are
+  // stateless per-invocation processes, so this step independently invokes
+  // detectSpecDrift/readStagedFiles rather than reusing SessionStart's result.
+  // Wrapped so any git/manifest failure is advisory-only and falls through to
+  // Step 6 instead of blocking the tool call.
+  if (process.env.DISABLE_SPEC_DRIFT_GUARD !== "true") {
+    const hasCommitCommand = commands.some((command) =>
+      GIT_COMMIT_RE.test(command)
+    );
+
+    if (hasCommitCommand) {
+      try {
+        const drift = detectSpecDrift({ workspace, gitRunner: injectedGitRunner });
+
+        if (drift) {
+          // Best-effort: when staged-file resolution fails, treat it as an
+          // empty set (no overlap ⇒ no false fire) rather than throwing.
+          const staged = readStagedFiles(injectedGitRunner) ?? [];
+          const hits = drift.domains.filter((domain) =>
+            staged.some((file) => matchesGlobs(file, domain.sources))
+          );
+
+          if (hits.length > 0) {
+            const names = hits.map((domain) => domain.domain).join(", ");
+            return makeDecision(
+              "ask",
+              `Vas a commitear con dominios de especificación derivados: ${names}. Considera ejecutar /sdd-reconcile antes de continuar.`
+            );
+          }
+        }
+      } catch (_e) {
+        // Advisory only — fall through to Step 6 on any failure.
+      }
+    }
   }
 
   // Step 6 — ASK rules.

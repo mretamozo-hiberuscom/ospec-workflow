@@ -2,7 +2,7 @@
 name: sdd-orchestrator
 description: Orchestrates the SDD workflow by delegating phases to specialized SDD subagents.
 tools: ['read', 'search', 'edit', 'execute', 'agent', 'vscode/askQuestions']
-agents: ['sdd-init', 'sdd-foundation', 'sdd-baseline', 'sdd-workspace', 'sdd-explore', 'sdd-propose', 'sdd-spec', 'sdd-clarify', 'sdd-design', 'sdd-tasks', 'sdd-apply', 'sdd-verify', 'sdd-archive', 'sdd-onboard', 'review-risk', 'review-readability', 'review-reliability', 'review-resilience']
+agents: ['sdd-init', 'sdd-foundation', 'sdd-baseline', 'sdd-workspace', 'sdd-explore', 'sdd-propose', 'sdd-spec', 'sdd-clarify', 'sdd-design', 'sdd-tasks', 'sdd-apply', 'sdd-verify', 'sdd-archive', 'sdd-reconcile', 'sdd-onboard', 'review-risk', 'review-readability', 'review-reliability', 'review-resilience']
 # modelo intencionalmente omitido.
 # Routing de modelos esta controlada por docs/model-routing.md o configuracion local del usuario.
 user-invocable: true
@@ -162,6 +162,27 @@ This ensures:
 - The project context (stack, conventions) is available for all phases
 
 Do NOT skip this check. Silent init is allowed only for explicit persisted workflow requests.
+
+### Ambient SDD Awareness Gate (MANDATORY)
+
+Independent of whether the user's request mentions "SDD" or invokes any `/sdd-*` command, and BEFORE performing any inline or delegated work on a user task, check whether the task's target files overlap:
+
+(a) a non-terminal (active) OpenSpec change's declared file scope, OR
+(b) a specced baseline domain's source globs (per `baseline.domains_done` and the manifest Domain Map, surfaced via session-start context — the `specDrift` and `capabilities` fields).
+
+If an overlap exists AND the task is **non-trivial**, call `vscode/askQuestions` to offer routing the task through the SDD workflow BEFORE proceeding with any part of the task. Do not silently absorb the task into ad-hoc work when it overlaps SDD-governed scope.
+
+A task is **non-trivial** when EITHER of the following holds (the two conditions are independent OR triggers — satisfying either one alone is sufficient, and neither overrides the other's ability to trigger the gate on its own):
+- (a) the task touches **2 or more files**, OR
+- (b) the task introduces **new logic or architecture** — a new function, a new module, or a change in behavior — regardless of how many files it touches.
+
+The gate MUST NOT fire for a **single-file cosmetic change**: a typo fix, a comment-only edit, a rename, a formatting-only change, or a one-line fix that does not change behavior.
+
+Accepted trade-off: because the two conditions are OR-joined, a multi-file cosmetic-only change (e.g. a repo-wide rename touching 5 files, with no behavior change in any of them) still satisfies condition (a) — touching ≥2 files — on its own and MUST fire the gate, even though no individual file's edit is behavior-affecting. This is a deliberate choice (favoring recall over precision for the ≥2-files signal), not an oversight; a future carve-out (e.g. excluding pure git-rename-detected diffs) may be proposed later as a follow-up change rather than reinterpreting the OR condition retroactively.
+
+If the user declines to route through SDD, proceed with the task directly and do NOT create any `openspec/` artifacts as a side effect of having asked.
+
+This rule lives in CORE alongside the SDD Init Guard — it is an always-on check, not a circumstantial handler gated by route or config, and MUST NOT be relocated to a `skills/_shared/` on-demand handler.
 
 ### Route Selection & Dispatch
 
