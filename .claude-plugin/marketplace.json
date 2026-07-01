@@ -1,0 +1,26 @@
+{
+  "name": "ospec-tools",
+  "description": "OSpec Workflow Claude Code local marketplace",
+  "owner": {
+    "name": "Manuel Michael Retamozo García",
+    "email": "mretamozo@hiberus.com"
+  },
+  "plugins": [
+    {
+      "name": "ospec-workflow",
+      "displayName": "OSpec Workflow",
+      "description": "Spec-Driven Development workflow with OpenSpec, strict TDD, phase agents, skills, hooks, and verification contracts.",
+      "source": "./plugins/ospec-workflow",
+      "repository": "https://github.com/mretamozo-hiberuscom/ospec-workflow",
+      "license": "MIT",
+      "keywords": [
+        "sdd",
+        "openspec",
+        "tdd",
+        "agents",
+        "workflow"
+      ],
+      "category": "development"
+    }
+  ]
+}

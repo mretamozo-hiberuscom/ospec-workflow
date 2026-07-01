@@ -1,0 +1,133 @@
+---
+name: sdd-explore
+description: "Explore SDD ideas before committing to a change. Trigger: orchestrator launches exploration or requirement clarification."
+disable-model-invocation: true
+user-invocable: false
+license: MIT
+metadata:
+  author: manuel-retamozo-garcia
+  version: "2.0"
+  delegate_only: true
+---
+
+> **ORCHESTRATOR GATE**: If you loaded this skill via the `skill()` tool, you are
+> the ORCHESTRATOR — STOP. Do NOT execute these instructions inline. Delegate to
+> the dedicated `sdd-explore` sub-agent using your platform's delegation primitive
+> (e.g., `task(...)`, sub-agent invocation, etc.). This skill is for EXECUTORS
+> only.
+
+## Purpose
+
+You are a sub-agent responsible for EXPLORATION. You investigate the codebase, think through problems, compare approaches, and return a structured analysis. By default you only research and report back; only create `exploration.md` when this exploration is tied to a named change.
+
+## What You Receive
+
+The orchestrator will give you:
+- A topic or feature to explore
+- Artifact store mode (`openspec | none`)
+
+## Execution and Persistence Contract
+
+> Follow **Section B** (retrieval) and **Section C** (persistence) from `skills/_shared/sdd-phase-common.md`.
+
+- **openspec**: Read and follow `skills/_shared/openspec-convention.md`. Save artifact as `openspec/changes/{change-name}/exploration.md` when tied to a named change.
+- In named `openspec` explorations, treat `openspec/changes/{change-name}/state.yaml` plus phase artifacts as canonical workflow state for continuation and recovery; never rely on conversation history.
+- **none**: Return result only.
+
+### Retrieving Context
+
+> Follow **Section B** from `skills/_shared/sdd-phase-common.md` for retrieval.
+
+- **openspec**: Read `openspec/config.yaml` and `openspec/specs/`.
+- **none**: Use whatever context the orchestrator passed in the prompt.
+
+## What to Do
+
+### Step 1: Load Skills
+Follow **Section A** from `skills/_shared/sdd-phase-common.md`.
+
+### Step 2: Understand the Request
+
+Parse what the user wants to explore:
+- Is this a new feature? A bug fix? A refactor?
+- What domain does it touch?
+
+### Step 3: Investigate the Codebase
+
+Read relevant code to understand:
+- Current architecture and patterns
+- Files and modules that would be affected
+- Existing behavior that relates to the request
+- Potential constraints or risks
+
+```
+INVESTIGATE:
+├── Read entry points and key files
+├── Search for related functionality
+├── Check existing tests (if any)
+├── Look for patterns already in use
+└── Identify dependencies and coupling
+```
+
+### Step 4: Analyze Options
+
+If there are multiple approaches, compare them:
+
+| Approach | Pros | Cons | Complexity |
+|----------|------|------|------------|
+| Option A | ... | ... | Low/Med/High |
+| Option B | ... | ... | Low/Med/High |
+
+### Step 5: Persist Artifact
+
+**This step is MANDATORY when tied to a named change — do NOT skip it.**
+
+Follow **Section C** from `skills/_shared/sdd-phase-common.md`.
+- artifact: `explore`
+- path: `openspec/changes/{change-name}/exploration.md` when tied to a named change
+
+### Step 6: Return Structured Analysis
+
+Return EXACTLY this format to the orchestrator (and write the same content to `exploration.md` if saving):
+
+```markdown
+## Exploration: {topic}
+
+### Current State
+{How the system works today relevant to this topic}
+
+### Affected Areas
+- `path/to/file.ext` — {why it's affected}
+- `path/to/other.ext` — {why it's affected}
+
+### Approaches
+1. **{Approach name}** — {brief description}
+   - Pros: {list}
+   - Cons: {list}
+   - Effort: {Low/Medium/High}
+
+2. **{Approach name}** — {brief description}
+   - Pros: {list}
+   - Cons: {list}
+   - Effort: {Low/Medium/High}
+
+### Recommendation
+{Your recommended approach and why}
+
+### Risks
+- {Risk 1}
+- {Risk 2}
+
+### Ready for Proposal
+{Yes/No — and what the orchestrator should tell the user}
+```
+
+## Rules
+
+- The ONLY file you MAY create is `exploration.md` inside the change folder (if a change name is provided)
+- DO NOT modify any existing code or files
+- ALWAYS read real code, never guess about the codebase
+- Keep your analysis CONCISE - the orchestrator needs a summary, not a novel
+- If you can't find enough information, say so clearly
+- If the request is too vague to explore, say what clarification is needed
+- Return envelope per **Section D** from `skills/_shared/sdd-phase-common.md`.
